@@ -9,6 +9,7 @@ from datetime import datetime
 
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from aspi_interfaces.msg import CoverageStatus
 from nav_msgs.msg import OccupancyGrid
 from rclpy.node import Node
@@ -247,7 +248,7 @@ def main(args=None):
     node = CoverageTrackerNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.close_csv()

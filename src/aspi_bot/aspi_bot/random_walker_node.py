@@ -5,6 +5,7 @@ Interface fine : /scan -> distance frontale -> RandomWalkerLogic -> /cmd_vel.
 import math
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -83,10 +84,11 @@ def main(args=None):
     node = RandomWalkerNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.stop()
+        if rclpy.ok():
+            node.stop()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

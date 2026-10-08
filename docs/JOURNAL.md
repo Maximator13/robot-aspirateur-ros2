@@ -151,3 +151,53 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - (b) Aucune boucle d'attente ne doit rester en arrière-plan après un run.
 - **Justification** : (a) une QoS incompatible entre éditeur et abonné empêche toute réception, sans message d'erreur explicite. (b) une boucle restante consomme des ressources et peut perturber le run suivant.
 - **Résultat-leçon** : vérifier la QoS de chaque topic avant de s'abonner. Ne jamais laisser de boucle d'attente derrière soi.
+
+### 2026-10-08 · Lancement du jour 2
+
+- **Contexte** : début du jour 2, stratégie B planifiée (balayage boustrophédon exécuté par Nav2). Le travail est découpé en 10 tickets, J2-01 à J2-10, dans `docs/TASKS.md`.
+- **Options envisagées** : config Nav2 issue du `burger.yaml` racine du paquet installé ; config issue de `turtlebot3_navigation2/param/humble/burger.yaml`. Pour Nav2 : simulation en temps réel ou en mode accéléré.
+- **Choix** : base `turtlebot3_navigation2/param/humble/burger.yaml`. Nav2 testé d'abord en temps réel ; mode accéléré seulement après vérification croisée.
+- **Justification** : le `burger.yaml` racine du paquet installé contient des éléments Jazzy (opennav_docking), inutilisables en Humble. La boucle de contrôle de Nav2 est probablement cadencée en temps mural : une accélération la pénaliserait, ce qui reste à vérifier.
+- **Résultat-leçon** : écarts prévus, à documenter dans la config. `xy_goal_tolerance` passe de 0.25 à 0.15 m (espacement de balayage de 0.18 m). `stop_on_failure` est déjà à false et `robot_model_type` déjà à DifferentialMotionModel dans cette version : aucun changement nécessaire sur ces deux points.
+
+### 2026-10-08 · Premier run B (réglage T0) : résultat décevant
+
+- **Contexte** : premier run complet de la stratégie B (balayage boustrophédon exécuté par Nav2), en temps réel, 600 s.
+  - Mise en route : Nav2 actif en environ 12 s ; planner et tracker d'accord (5564 cellules, 112 waypoints) ; pose de départ d'environ (0, 0).
+  - Non-régression de la stratégie A après refactoring du launch : 10.5 % à 60 s (référence 10.46 %), OK.
+  - Résultat B : 33.2 % couvert (A : 51.0 ± 6.7 %), 40.9 m parcourus (A : 70.8 m), 13 near_collisions. Balayage arrêté au waypoint 44/112, avec 1 waypoint manqué (indice 41).
+  - Paliers : couverture bloquée entre 17 et 22 % de 3 à 8 min. Certains waypoints prennent 50 à 75 s (n° 20, 30, 32, 44), contre 3 à 20 s pour les autres.
+  - Log Nav2 : 22 « Failed to make progress », 28 « Controller patience exceeded », recoveries (spin, backup), « Control loop missed its desired rate 10 Hz » répété. Facteur temps réel 0.91.
+- **Options envisagées** :
+  - Diagnostic (chef de projet, à confirmer par les runs de réglage) :
+    - (1) La config TurtleBot3 règle `waypoint_follower.loop_rate` à 2000 Hz (défaut Nav2 : 20). Résultat : 37 000 lignes « Processing waypoint » dans le log, CPU saturé.
+    - (2) Les waypoints bloquants sont tous près d'un pilier ou d'un mur. La costmap locale gonfle les obstacles de 1.0 m (globale : 0.55 m), alors que le planner place volontairement les lignes à au moins 0.155 m des obstacles. Le contrôleur DWB n'avance plus et déclenche les recoveries.
+  - Corriger les deux causes d'un coup, ou un seul facteur à la fois avec mesure après chaque correction.
+- **Choix** : un facteur à la fois, runs de réglage de 300 s pour gagner du temps, protocole final à 600 s.
+  - T1 : `loop_rate` à 20 seul.
+  - T2 : T1 + inflation à 0.30 m et `cost_scaling` à 10 dans les deux costmaps.
+  - Run T0 conservé dans `results/reglages_B/`.
+- **Justification** : mesurer chaque correction séparément permet d'attribuer l'effet de chacune.
+- **Résultat-leçon** : une config « officielle » peut contenir des valeurs inadaptées. Les paramètres de sécurité de Nav2 (inflation) sont pensés pour la navigation point à point, pas pour la couverture, qui longe volontairement les obstacles.
+
+### 2026-10-08 · Mesure de la fréquence de contrôle de Nav2
+
+- **Contexte** : `/cmd_vel` est publié à 21 Hz en temps simulé. Cette fréquence n'est pas celle du contrôleur (10 Hz configuré).
+- **Options envisagées** : non applicable (mesure).
+- **Choix** : pour mesurer le contrôleur, enregistrer `/cmd_vel_nav`.
+- **Justification** : `nav2_bringup` remappe la sortie du `controller_server` sur `/cmd_vel_nav` et ajoute un `velocity_smoother` (20 Hz) qui publie `/cmd_vel`. Le 21 Hz mesuré sur `/cmd_vel` vient donc du smoother.
+- **Résultat-leçon** : lire le launch de bringup avant d'interpréter un topic.
+
+### 2026-10-08 · Incidents d'exploitation sur la stratégie B
+
+- **Contexte** : trois incidents lors des essais de la stratégie B.
+  - (a) À l'arrêt, `component_container_isolated` (conteneur Nav2) survit à SIGINT et SIGTERM.
+  - (b) À l'arrêt, `coverage_executor` levait une exception.
+  - (c) L'argument de launch `params_file` fuyait vers `gzserver`.
+- **Options envisagées** : non applicable (incidents d'exécution).
+- **Choix** :
+  - (a) arrêt par SIGKILL sur le PID du conteneur ;
+  - (b) exception corrigée ;
+  - (c) argument renommé `nav2_params`.
+- **Justification** : (c) les arguments de launch ne sont pas cloisonnés entre nœuds inclus en ROS 2 Humble.
+- **Résultat-leçon** : les arguments de launch sont partagés entre les nœuds inclus : leur donner des noms spécifiques. Un conteneur Nav2 peut survivre à l'arrêt normal : vérifier son PID après chaque run.

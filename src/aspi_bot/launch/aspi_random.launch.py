@@ -1,7 +1,7 @@
 """Stratégie A — aléatoire (bump and turn).
 
-Lance : Gazebo (turtlebot3_world) + map_server (carte de référence, vérité terrain pour la mesure)
-+ TF statique map -> odom + random_walker + coverage_tracker + RViz.
+Lance : simulation commune (sim.launch.py) + map_server (carte de référence, vérité terrain pour
+la mesure) + TF statique map -> odom + random_walker + coverage_tracker + RViz.
 
 Le robot n'utilise PAS la carte : elle sert uniquement au tracker pour calculer le % couvert.
 Hypothèse : la carte a été construite depuis la position de spawn, donc l'origine de map = spawn ;
@@ -17,26 +17,15 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
-def gzserver(gazebo_ros_dir, world_file, condition, lockstep):
-    """Serveur Gazebo (physique + capteurs) sur un monde donné."""
-    return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(gazebo_ros_dir, 'launch', 'gzserver.launch.py')),
-        launch_arguments={'world': world_file, 'lockstep': lockstep}.items(),
-        condition=condition)
-
-
 def generate_launch_description():
     aspi_dir = get_package_share_directory('aspi_bot')
-    tb3_gazebo_dir = get_package_share_directory('turtlebot3_gazebo')
-    gazebo_ros_dir = get_package_share_directory('gazebo_ros')
 
     seed = LaunchConfiguration('seed')
     map_yaml = LaunchConfiguration('map')
@@ -63,35 +52,11 @@ def generate_launch_description():
         DeclareLaunchArgument('spawn_y', default_value='-0.5'),
     ]
 
-    # --- Gazebo ---
-    # Monde d'origine (temps réel) ou copie accélérée (real_time_update_rate = 0).
-    # En accéléré, lockstep : la physique attend la mise à jour des capteurs (pas de scan perdu).
-    # Choix assumé : gzserver.launch.py déclare aussi un argument « seed », il reçoit donc
-    # notre graine -> le générateur aléatoire de Gazebo est fixé lui aussi (reproductibilité).
-    gzserver_normal = gzserver(
-        gazebo_ros_dir, os.path.join(tb3_gazebo_dir, 'worlds', 'turtlebot3_world.world'),
-        UnlessCondition(fast), 'false')
-    gzserver_fast = gzserver(
-        gazebo_ros_dir, os.path.join(aspi_dir, 'worlds', 'turtlebot3_world_fast.world'),
-        IfCondition(fast), 'true')
-    gzclient = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(gazebo_ros_dir, 'launch', 'gzclient.launch.py')),
-        condition=UnlessCondition(headless))
-
-    robot_state_publisher = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(tb3_gazebo_dir, 'launch', 'robot_state_publisher.launch.py')),
-        launch_arguments={'use_sim_time': 'true'}.items())
-
-    # Spawn du robot : timeout porté à 120 s (sous WSL, Gazebo peut mettre plus de 30 s à démarrer)
-    spawn = Node(
-        package='gazebo_ros', executable='spawn_entity.py', output='screen',
-        arguments=['-entity', 'burger',
-                   '-file', os.path.join(tb3_gazebo_dir, 'models', 'turtlebot3_burger',
-                                         'model.sdf'),
-                   '-x', spawn_x, '-y', spawn_y, '-z', '0.01',
-                   '-timeout', '120'])
+    # Monde + robot, communs aux deux stratégies
+    simulation = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(aspi_dir, 'launch', 'sim.launch.py')),
+        launch_arguments={'headless': headless, 'fast': fast,
+                          'spawn_x': spawn_x, 'spawn_y': spawn_y}.items())
 
     # --- Carte de référence : map_server (nœud lifecycle) activé par le lifecycle_manager ---
     map_server = Node(
@@ -132,5 +97,4 @@ def generate_launch_description():
         parameters=[sim], condition=UnlessCondition(headless))
 
     return LaunchDescription(args + [
-        gzserver_normal, gzserver_fast, gzclient, robot_state_publisher, spawn,
-        map_server, lifecycle_manager, map_to_odom, walker, tracker, rviz])
+        simulation, map_server, lifecycle_manager, map_to_odom, walker, tracker, rviz])
