@@ -210,7 +210,7 @@ Différence avec A : `map → odom` vient d'AMCL, pas d'un TF statique.
 - Il estime la pose du robot sur la carte, et publie la correction `map → odom`.
 - Avant la pose initiale (fixée par l'executor via `/initialpose`), AMCL ne publie pas cette TF : le tracker attend.
 - Le tracker lit le même `map → base_footprint` qu'en A.
-- Fragilité observée : en mode accéléré, cette TF reste figée (« Transform data too old »). Voir section 4.
+- Fragilité observée : la TF `map → odom` vue par Nav2 est restée figée (« Transform data too old ») en mode accéléré, et aussi en temps réel (essai T1, run officiel B3). Voir section 4.
 
 ### 2.4 Launch : `aspi_planned.launch.py`
 
@@ -247,7 +247,7 @@ Base : `/opt/ros/humble/share/turtlebot3_navigation2/param/humble/burger.yaml`. 
 | 1 | `use_sim_time` | selon nœud | True partout | Simulation Gazebo |
 | 2 | `general_goal_checker.xy_goal_tolerance` | 0.25 m | 0.15 m | Espacement de balayage effectif de 0.20 m (0.18 arrondi sur la grille de 0.05) : 0.25 couperait les extrémités des lignes |
 | 3 | `waypoint_follower.loop_rate` | 2000 | 20 | 2000 Hz saturait le CPU (37 000 lignes « Processing waypoint ») ; 20 est le défaut Nav2. Essai T1 |
-| 4 | inflation des deux costmaps | rayon 1.0 (locale) et 0.55 (globale), échelle 3.0 | rayon 0.30, échelle 10.0 | Le planner garantit déjà une marge de 0.155 m. Une large inflation repousse les lignes vers l'intérieur. Essai T2 |
+| 4 | inflation des deux costmaps | rayon 1.0 (locale) et 0.55 (globale), échelle 3.0 | rayon 0.30, échelle 10.0 | Le planner garantit déjà une marge de 0.155 m. Une large inflation repousse le plan global de NavFn loin des obstacles (nos lignes de balayage ne sont pas modifiées). Essai T2 |
 | 5 | `controller_server.FollowPath` | DWB | Regulated Pure Pursuit, vitesse 0.15 m/s, visée fixe 0.3 m, rotation sur place à 1.0 rad/s | DWB restait bloqué devant un pilier. Vitesses alignées sur `random_walker` pour une comparaison équitable. Essai T3 retenu : 28.5 % à 300 s contre 21.9 % |
 | 6 | `FollowPath.approach_velocity_scaling_dist` | 0.6 m (défaut Humble) | 0.2 m | Le robot ralentissait sur les 0.6 derniers mètres de chaque waypoint. 0.2 reste juste au-dessus de `xy_goal_tolerance` (0.15). Essai T5 |
 | 7 | `waypoint_follower.waypoint_pause_duration` | 200 ms | 0 | Pause inutile pour un balayage. Essai T5 : 59.7 % contre 54.1 % à 600 s (un run par configuration) |
@@ -286,7 +286,7 @@ Deux modes existent. Le critère reste le temps simulé : le % couvert est trac�
 |---|---|---|
 | Mode retenu | Accéléré (`fast:=true`, headless) | Temps réel |
 | Validation | 5 critères fixés avant les runs, tous OK | 5 critères fixés avant les runs, 3 KO |
-| Facteur | environ 2.8 (600 s simulées en 3.5 min) | non applicable |
+| Facteur (temps simulé / temps mural) | 2.84 à 3.08 (600 s simulées en environ 3.5 min) | 0.84 à 0.94 (temps réel) |
 
 **A en accéléré.** Critères : `/scan` à 5 Hz, `/cmd_vel` à 10 Hz, vitesse moyenne, near_collisions, % final.
 Mesures : 5.00 Hz, 9.99 Hz, 0.120 m/s, 24 contre 27, 54.4 % contre 58.1 %. Les courbes sont superposées jusqu'à environ 5 min, puis divergent (marche aléatoire).
@@ -294,14 +294,14 @@ Mesures : 5.00 Hz, 9.99 Hz, 0.120 m/s, 24 contre 27, 54.4 % contre 58.1 %. Les c
 **B en temps réel.** Même vérification croisée (seed 1, 600 s) :
 
 - Fréquence de `/cmd_vel_nav` : 4.42 Hz en accéléré contre 9.56 Hz en temps réel (critère KO).
-- En accéléré, la TF `map → odom` d'AMCL reste figée à 89 s simulées (2 292 messages « Transform data too old »). AMCL décroche.
+- En accéléré, la TF `map → odom` d'AMCL reste figée à 89 s simulées (2 292 messages « Transform data too old »). La TF `map → odom` vue par Nav2 reste figée. Le même gel a eu lieu en temps réel (T1 et run officiel B3, où le rosbag montre AMCL publiant normalement).
 - Waypoints atteints : 8 contre 69 (KO). Incidents : 85 contre 1 (KO).
 - Le % final paraît proche (56.8 % contre 54.1 %) mais les courbes divergent (53.6 % contre 29.0 % à 300 s) : le critère seul est trompeur.
 - Cause probable (non démontrée) : les boucles de Nav2 sont cadencées en temps mural.
 
 **Conséquence pour la comparaison.** A et B sont comparées en temps simulé, chacune dans un mode dont la fidélité est vérifiée.
-Limites : modes différents, un seul run de B, facteur d'accélération dépendant de la charge de la machine.
-Run d'essai B (T3, seed 1, 600 s, temps réel) : 54.1 % de couverture, 61.9 m, 1 near_collision, 69 waypoints sur 112 ; avec T5 (seed 5) : 59.7 %, 69.8 m, 73 waypoints. A (3 seeds) : 51.0 ± 6.7 %. Résultats officiels de B (3 runs, config T5) : voir `docs/RESULTATS.md`.
+Limites : modes différents, 3 runs de B en temps réel dont un bloqué (B3), facteur d'accélération dépendant de la charge de la machine.
+Runs d'essai B (réglage) : T3 (seed 1, 600 s, temps réel) 54.1 % de couverture, 61.9 m, 1 near_collision, 69 waypoints sur 112 ; T5 (seed 5) 59.7 %, 69.8 m, 73 waypoints. Résultats officiels (config T5) : A 51.0 ± 6.7 % (3 seeds), B 44.1 ± 23.4 % (3 runs, dont B3 bloqué à 17.2 %). Détail dans `docs/RESULTATS.md`.
 Détails : `docs/JOURNAL.md`, entrées « Décision : simulation accélérée » et « vérification croisée ».
 
 ---
@@ -311,7 +311,7 @@ Détails : `docs/JOURNAL.md`, entrées « Décision : simulation accélérée »
 - Une comparaison honnête exige la même règle de mesure pour A et B.
 - Même source de pose : TF `map → base_footprint`.
 - Même dénominateur : le masque atteignable calculé par la même fonction de `planning.py`.
-- Même rayon de nettoyage (0.09 m) et même seuil de quasi-collision (0.15 m).
+- Même rayon de nettoyage (0.09 m demandé, arrondi à 2 cellules, soit 0.10 m appliqué) et même seuil de quasi-collision (0.15 m).
 - Même début de mesure : le premier déplacement. L'activation de Nav2 en B n'est donc pas comptée.
 - Seul le champ `strategy` change, et il nomme le CSV.
 

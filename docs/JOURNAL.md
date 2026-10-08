@@ -46,7 +46,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - Recalculer le nombre de lignes et centrer le bloc de lignes.
 - **Choix** : centrer le bloc, espacement constant.
 - **Justification** : garde l'espacement constant et le test d'espacement valide.
-- **Résultat-leçon** : 100 % en pièce vide simulée sur grille, 31 tests verts. Limite : les bords ne sont couverts que si le rayon de nettoyage est au moins égal à la moitié de l'espacement. Avec 0.09 m pour 0.18 m d'espacement, c'est juste suffisant.
+- **Résultat-leçon** : 100 % en pièce vide simulée sur grille, 31 tests verts. Limite : les bords ne sont couverts que si le rayon de nettoyage est au moins égal à la moitié de l'espacement. Le rayon demandé (0.09 m) est arrondi à 2 cellules (0.10 m) et l'espacement demandé (0.18 m) à 4 cellules (0.20 m) : la condition rayon ≥ espacement/2 est remplie grâce à ces arrondis.
 
 ### 2026-10-08 · Création de la carte de référence
 
@@ -218,16 +218,16 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - calculer les contournements dans notre planner (T4) ;
   - décomposition cellulaire de Choset (trop long pour 3 jours).
 - **Choix** : changer de contrôleur (T3). Réglages alignés sur la stratégie A pour une comparaison équitable : vitesse de 0.15 m/s (celle de `random_walker` ; DWB autorisait 0.22 m/s), rotation sur place à 1.0 rad/s (celle de `random_walker`), pas de ralentissement près des obstacles.
-- **Justification** : le blocage venait du comportement de DWB face au pilier, pas du réglage de l'inflation. RPP n'a pas été comparé à d'autres contrôleurs.
-- **Résultat-leçon** : à 300 s, T3 atteint 28.5 % de couverture (T2 : 21.9 %), 30.5 m parcourus, 1 near_collision (T2 : 5), 0 « Failed to make progress » (T2 : 13), 0 recovery. Dernier waypoint atteint : 37/112 (T2 : 19). Le passage du pilier prend environ 13 s : rotation sur place puis contournement par le sud. Limites restantes : la vitesse (0.15 m/s) et les rotations sur place (environ 48 s sur 300 s).
+- **Justification** : le changement de contrôleur (DWB → RPP, avec une vitesse ramenée de 0.22 à 0.15 m/s) a supprimé le blocage ; DWB n'a pas été testé à 0.15 m/s, on ne peut donc pas attribuer le gain au seul algorithme. RPP n'a pas été comparé à d'autres contrôleurs.
+- **Résultat-leçon** : à 300 s, T3 atteint 28.5 % de couverture (T2 : 21.9 %), 30.5 m parcourus, 1 near_collision (T2 : 5), 0 « Failed to make progress » (T2 : 13), 0 recovery. Dernier waypoint : 37/112 démarré (36 atteints) (T2 : 19). Le passage du pilier prend environ 13 s : rotation sur place puis contournement par le sud. Limites restantes : la vitesse (0.15 m/s) et les rotations sur place (environ 48 s sur 300 s).
 
 ### 2026-10-08 · Stratégie B : contournements calculés par le planner (T4, impasse)
 
 - **Contexte** : après T3, les lignes de balayage restent coupées par les obstacles. Essai de contournements calculés par notre planner.
 - **Options envisagées** : garder T3 seul ; ajouter des points de contournement calculés par le planner (T4).
 - **Choix** : T3 retenu. `plan_transitions` est conservé, testé, et désactivé par défaut (argument de launch).
-- **Justification** : principe de `plan_transitions` : fonction pure, Dijkstra sur le 8-voisinage du masque atteignable, simplification par visibilité, tronçons ≤ 0.3 m. Résultat : 112 → 245 waypoints, 49 transitions corrigées, 0 point hors masque, 8 tests unitaires (39 tests au total). Bug trouvé pendant le développement : des tronçons à 45° passaient exactement sur un coin de cellule, et l'arrondi les rangeait hors masque. Correction par un test exact de segment. Résultat T4 (T3 plus contournements) à 300 s : 22.3 % contre 28.5 % pour T3 ; 25 à 26 waypoints d'origine atteints contre 36 ; 43 « collision ahead » (RPP), 8 « patience exceeded », 3 recoveries. Les points intermédiaires consomment 38 % du temps, car chaque but déclenche une replanification et une rotation.
-- **Résultat-leçon** : avec RPP, Nav2 contourne déjà les obstacles. Notre marge (0.155 m) est aussi plus faible que ce que la costmap Nav2 accepte, d'où les conflits. Une amélioration algorithmique « évidente » doit être mesurée : elle peut être contre-productive selon le reste de la chaîne.
+- **Justification** : principe de `plan_transitions` : fonction pure, Dijkstra sur le 8-voisinage du masque atteignable, simplification par visibilité, tronçons ≤ 0.3 m. Résultat : 112 → 245 waypoints, 49 transitions corrigées, 0 point hors masque, 8 tests unitaires (39 tests au total). Bug trouvé pendant le développement : des tronçons à 45° passaient exactement sur un coin de cellule, et l'arrondi les rangeait hors masque. Correction par un test exact de segment. Résultat T4 (T3 plus contournements) à 300 s : 22.4 % contre 28.5 % pour T3 ; 25 à 26 waypoints d'origine atteints contre 36 ; 43 « collision ahead » (RPP), 8 « patience exceeded », 3 recoveries. Les points intermédiaires consomment 38 % du temps, car chaque but déclenche une replanification et une rotation.
+- **Résultat-leçon** : avec RPP, Nav2 contourne déjà les obstacles. Cause non démontrée : notre marge (0.155 m) est au-dessus du rayon inscrit (0.10 m), donc hors zone létale ; une hypothèse est que les plans NavFn entre points intermédiaires rasent les piliers à 0.10–0.15 m. Une amélioration algorithmique « évidente » doit être mesurée : elle peut être contre-productive selon le reste de la chaîne.
 
 ### 2026-10-08 · Bug : fuite mémoire de coverage_executor
 
@@ -262,7 +262,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - C3 « OK » en apparence : F 56.8 %, R 54.1 %. Trompeur : les courbes divergent (F 53.6 %, R 29.0 % à 300 s) ;
   - C4 KO : F 8 waypoints, R 69 ;
   - C5 KO : F 85 incidents, R 1.
-  - En F, la TF `map → odom` d'AMCL reste figée à 89 s simulées (2 292 messages « Transform data too old »), avec 55 near_collisions. F a parcouru 510 m en zigzags et recoveries, contre 61.9 m en R. Facteur d'accélération obtenu : environ 1.9 seulement.
+  - En F, la TF `map → odom` vue par Nav2 reste figée à 89 s simulées (2 292 messages « Transform data too old »), avec 55 near_collisions. F a parcouru 510 m en zigzags et recoveries, contre 61.9 m en R. Facteur d'accélération obtenu : environ 1.9 seulement.
 - **Résultat-leçon** : le mode accéléré est négatif pour B. Un critère isolé (C3) peut sembler bon par hasard : il faut plusieurs critères, dont des critères de comportement. Le risque identifié en revue était fondé.
 
 ### 2026-10-08 · Stratégie B : run de référence en temps réel (T3, seed 1)
@@ -273,7 +273,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Justification** : seul mode de mesure validé pour la stratégie B.
 - **Résultat-leçon** :
   - Couverture finale : 54.1 % (A : 51.0 ± 6.7 %). 80 % non atteint. Distance : 61.9 m. near_collisions : 1.
-  - Waypoints : 69 atteints sur 112. Un « Failed to make progress », 0 recovery. Facteur temps réel : 0.94.
+  - Waypoints : 69 atteints sur 112. Un « Failed to make progress », 0 recovery. Facteur temps réel : 0.95 (mesuré 0.952).
   - L'executor s'arrête seul à `max_duration` (610 s). Sa mémoire reste stable, environ 74 Mo : le correctif de fuite est confirmé.
   - Limite : un seul run, donc aucune conclusion statistique.
 
@@ -310,7 +310,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - la pose initiale est republiée jusqu'à réception sur `/amcl_pose` ;
   - plus aucune attente sans délai dans l'executor ;
   - `rclpy` est initialisé avec `SignalHandlerOptions.NO`, pour que SIGINT lève `KeyboardInterrupt`.
-- **Justification** : cause confirmée dans le code de `nav2_simple_commander` (Humble). `_waitForNodeToActivate` appelle `spin_until_future_complete` sans délai sur la réponse du service `GetState`. Si la réponse est perdue, le processus reste bloqué dans cette attente en code C : l'interpréteur Python ne reprend jamais la main et SIGINT n'est jamais traité.
+- **Justification** : mécanisme identifié dans le code de `nav2_simple_commander` (Humble, attente sans délai) ; la perte de la réponse elle-même n'a pas été observée directement. `_waitForNodeToActivate` appelle `spin_until_future_complete` sans délai sur la réponse du service `GetState`. Si la réponse est perdue, le processus reste bloqué dans cette attente en code C : l'interpréteur Python ne reprend jamais la main et SIGINT n'est jamais traité. Voir aussi l'entrée « SIGINT ignoré par les processus lancés en arrière-plan » : le Ctrl+C ignoré s'explique au moins en partie par la méthode de lancement.
 - **Résultat-leçon** : à valider pendant les runs officiels de la stratégie B. Une bibliothèque « simple » peut cacher une attente infinie : toute attente réseau doit avoir un délai.
 
 ### 2026-10-08 · Correctif : course au démarrage de Nav2 (but FollowWaypoints rejeté)
@@ -334,7 +334,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - B2 : 55.4 %, 62.2 m, 2 near_collisions, 70/112 waypoints.
   - B3 : 17.2 %, 29.5 m, 25 near_collisions, 14/112 waypoints.
   - Moyenne B : 44.1 ± 23.4 %. A (3 runs accélérés) : 51.0 ± 6.7 %.
-  - 80 % jamais atteint. Courbes A et B quasi superposées jusqu'à environ 7 min.
+  - 80 % jamais atteint. Moyennes de A et B à moins de 4 points jusqu'à 540 s (B3 tire la moyenne de B vers le bas) ; B1 et B2 devant la moyenne de A dès ≈ 4 min.
   - Dispersion de B nettement plus forte que celle de A. Avec 3 runs, aucune conclusion statistique solide.
 
 ### 2026-10-08 · Run B3 : TF figée dans Nav2 et choix de la moyenne officielle
@@ -351,7 +351,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Options envisagées** : non précisées dans le compte rendu source (à compléter si nécessaire).
 - **Choix** : découpage de la fonction d'attente en petites fonctions (attente d'un nœud actif, attente de la pose initiale, attente du serveur d'action). Annulation protégée regroupée dans une seule fonction.
 - **Justification** : un nœud = une responsabilité, et chaque fonction doit pouvoir être expliquée en une phrase. Comme le code a changé après les mesures, un essai de non-régression en simulation a été fait (120 s, temps réel).
-- **Résultat-leçon** : séquence de démarrage conforme (amcl actif, pose initiale, bt_navigator actif, waypoint_follower actif, Nav2 actif, 112 waypoints). Couverture à 60 s et 120 s : 7.6 % et 15.4 %, à comparer aux runs officiels B1/B2 (8.4 à 8.5 % et 15.6 à 16.2 %). Arrêt automatique à `max_duration` avec annulation du but (« Goal was canceled. Stopping the robot. »). Arrêt manuel par SIGINT en 1 s. Toute modification faite après une mesure demande une non-régression, même si elle semble purement cosmétique. Il s'agit d'un seul essai, pas d'une campagne.
+- **Résultat-leçon** : séquence de démarrage conforme (amcl actif, pose initiale, bt_navigator actif, waypoint_follower actif, Nav2 actif, 112 waypoints). Couverture à 60 s et 120 s : 7.6 % et 15.4 %, à comparer aux runs officiels B1/B2 (8.3–8.4 % à 60 s, 15.5–16.2 % à 120 s). Arrêt automatique à `max_duration` avec annulation du but (« Goal was canceled. Stopping the robot. »). Arrêt manuel par SIGINT en 1 s. Toute modification faite après une mesure demande une non-régression, même si elle semble purement cosmétique. Il s'agit d'un seul essai, pas d'une campagne.
 
 ### 2026-10-08 · Découverte : SIGINT ignoré par les processus lancés en arrière-plan
 
@@ -360,3 +360,13 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : relancer le test avec SIGINT remis par défaut, et ne pas modifier le code de l'executor pour ce motif.
 - **Justification** : un processus lancé en arrière-plan (`&`, `nohup`) par un shell non interactif hérite d'un SIGINT ignoré. Python n'installe alors pas son gestionnaire de SIGINT. Ce mécanisme explique au moins en partie les executors survivants observés. Ce n'était donc pas uniquement un défaut de notre code.
 - **Résultat-leçon** : avant de conclure à un bug du code testé, vérifier l'outil de test (signaux hérités, environnement du shell). La méthode de test a été corrigée.
+
+### 2026-10-08 · Jour 3 du plan — code gelé, pas de vidéo de démonstration
+
+- **Contexte** : le jour 3 est consacré à l'évaluation et aux livrables. Le cahier de soutenance demande « vidéo ou captures de la démo ».
+- **Options envisagées** :
+  - vidéo d'environ 30 s (Gazebo + RViz), enregistrée par l'étudiant sous Windows ;
+  - captures : figures de `results/` (couverture en fonction du temps, courbes par run), capture RViz éventuelle.
+- **Choix** (décision de l'étudiant) : pas de vidéo. Les figures de `results/` (couverture en fonction du temps, courbes par run) servent de captures de démo.
+- **Justification** : choix de l'étudiant.
+- **Résultat-leçon** : code gelé. Le jour 3 ne contient que l'audit de cohérence des documents, le plan des slides avec la préparation des questions du jury, et un README d'utilisation.

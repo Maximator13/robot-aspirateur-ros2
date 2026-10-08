@@ -3,6 +3,11 @@
 
 Usage :
     python3 scripts/plot_results.py [--results-dir DIR] [--duration 600]
+                                    [--no-mean] [--labels HORODATAGE=ETIQUETTE,...]
+
+--no-mean : ni courbe moyenne ni ligne de moyenne (runs de modes différents,
+            par exemple temps réel contre accéléré : moyenner n'a pas de sens).
+--labels  : étiquette par run, repérée par son horodatage (ex. 174302=temps réel).
 
 Entrée : DIR/<STRATEGIE>_<seed>_<AAAAMMJJ-HHMMSS>.csv
          colonnes : time, coverage_percent, distance, near_collisions
@@ -49,7 +54,7 @@ def lire_run(path):
         return None
     strategie, seed = parse_nom(path)
     return {'strategie': strategie, 'seed': seed, 't': t, 'cov': cov,
-            'dist': dist, 'nc': nc}
+            'dist': dist, 'nc': nc, 'horodatage': path.stem.split('_')[-1]}
 
 
 def temps_pour_seuil(run, seuil=SEUIL):
@@ -69,14 +74,31 @@ def courbe_sur_grille(run, grille):
     return np.interp(grille, run['t'], run['cov'])
 
 
-def tracer(runs_par_strat, duration, sortie):
-    """Trace moyenne + enveloppe min/max + runs individuels par stratégie."""
+def etiquette(run, labels):
+    """Étiquette d'un run : celle donnée par --labels (suffixe d'horodatage), sinon vide."""
+    for cle, txt in labels.items():
+        if run['horodatage'].endswith(cle):
+            return txt
+    return ''
+
+
+def tracer(runs_par_strat, duration, sortie, no_mean=False, labels=None):
+    """Trace moyenne + enveloppe min/max + runs individuels par stratégie.
+
+    Avec no_mean : seulement les runs, chacun avec son étiquette, sans moyenne.
+    """
+    labels = labels or {}
     grille = np.arange(0, duration + 1, 1.0)
     x = grille / 60.0  # minutes
     fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
     for strat, runs in sorted(runs_par_strat.items()):
         c = COULEURS.get(strat, COULEUR_DEFAUT)
         courbes = np.array([courbe_sur_grille(r, grille) for r in runs])
+        if no_mean:
+            for r, y in zip(runs, courbes):
+                ax.plot(x, y, color=c, lw=2, ls='-' if etiquette(r, labels) != 'accéléré' else '--',
+                        label=f"{strat} {etiquette(r, labels) or 'seed ' + r['seed']}")
+            continue
         for y in courbes:
             ax.plot(x, y, color=c, lw=1.2, alpha=0.9, ls='--')
         ax.fill_between(x, courbes.min(axis=0), courbes.max(axis=0),
@@ -86,7 +108,8 @@ def tracer(runs_par_strat, duration, sortie):
     ax.axhline(SEUIL, color='gray', ls='--', lw=1, label=f'{SEUIL:.0f} %')
     ax.set_xlabel('Temps simulé (min)')
     ax.set_ylabel('Surface couverte (%)')
-    ax.set_title('Couverture en fonction du temps : stratégie aléatoire vs planifiée')
+    ax.set_title('Couverture en fonction du temps : une courbe par run (sans moyenne)' if no_mean
+                 else 'Couverture en fonction du temps : stratégie aléatoire vs planifiée')
     ax.set_xlim(0, duration / 60.0)
     ax.set_ylim(0, 100)
     ax.grid(alpha=0.3)
@@ -122,7 +145,10 @@ def tracer_par_run(runs_par_strat, duration, sortie):
 
 
 def cov_a(run, t):
-    """Couverture à l'instant t (dernière valeur connue avant t)."""
+    """Couverture à l'instant t, par interpolation linéaire entre les deux points CSV voisins.
+
+    C'est la seule méthode utilisée pour toutes les valeurs « % à t s » du projet.
+    """
     return float(np.interp(t, run['t'], run['cov']))
 
 
@@ -130,9 +156,11 @@ def fmt_temps(t):
     return 'non atteint' if t is None else f'{t:.0f} s'
 
 
-def ligne_run(r):
+def ligne_run(r, labels=None):
     t80 = temps_pour_seuil(r)
-    return (f"| {r['strategie']} | {r['seed']} | {r['t'][-1]:.0f} s | "
+    lab = etiquette(r, labels) if labels else ''
+    seed = f"{r['seed']} ({lab})" if lab else r['seed']
+    return (f"| {r['strategie']} | {seed} | {r['t'][-1]:.0f} s | "
             f"{r['cov'][-1]:.1f} % | {cov_a(r, T_INTERMEDIAIRE):.1f} % | {fmt_temps(t80)} | "
             f"{r['dist'][-1]:.1f} | {int(r['nc'][-1])} |")
 
@@ -155,13 +183,14 @@ def ligne_moyenne(strat, runs):
             f"{ms([r['nc'][-1] for r in runs], '{:.1f}')} |")
 
 
-def construire_tableau(runs_par_strat):
-    """Tableau Markdown : une ligne par run, puis moyenne ± écart-type."""
+def construire_tableau(runs_par_strat, no_mean=False, labels=None):
+    """Tableau Markdown : une ligne par run, puis (sauf no_mean) moyenne ± écart-type."""
     out = ['| Stratégie | Seed | Durée | % final | % à 300 s | Temps pour 80 % | Distance (m) | near_collisions |',
            '|---|---|---|---|---|---|---|---|']
     for strat, runs in sorted(runs_par_strat.items()):
-        out += [ligne_run(r) for r in runs]
-        out.append(ligne_moyenne(strat, runs))
+        out += [ligne_run(r, labels) for r in runs]
+        if not no_mean:
+            out.append(ligne_moyenne(strat, runs))
     return '\n'.join(out) + '\n'
 
 
@@ -171,7 +200,12 @@ def main():
     ap.add_argument('--results-dir', type=Path, default=racine)
     ap.add_argument('--duration', type=float, default=600,
                     help='durée de la grille de temps en s (défaut 600)')
+    ap.add_argument('--no-mean', action='store_true',
+                    help='pas de moyenne (courbe et tableau) : une ligne par run')
+    ap.add_argument('--labels', default='',
+                    help="étiquettes par horodatage, ex. 174302=temps réel,180548=accéléré")
     args = ap.parse_args()
+    labels = dict(kv.split('=', 1) for kv in args.labels.split(',') if '=' in kv)
 
     runs_par_strat = {}
     for p in sorted(args.results_dir.glob('*.csv')):
@@ -182,10 +216,11 @@ def main():
         sys.exit(f'Aucun CSV exploitable dans {args.results_dir}')
 
     png = args.results_dir / 'coverage_vs_time.png'
-    tracer(runs_par_strat, args.duration, png)
+    tracer(runs_par_strat, args.duration, png, args.no_mean, labels)
     png_runs = args.results_dir / 'coverage_vs_time_runs.png'
-    tracer_par_run(runs_par_strat, args.duration, png_runs)
-    tableau = construire_tableau(runs_par_strat)
+    if not args.no_mean:
+        tracer_par_run(runs_par_strat, args.duration, png_runs)
+    tableau = construire_tableau(runs_par_strat, args.no_mean, labels)
     (args.results_dir / 'summary.md').write_text(
         '# Résumé des runs\n\n' + tableau, encoding='utf-8')
     print(tableau)

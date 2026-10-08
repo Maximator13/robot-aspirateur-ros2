@@ -1,6 +1,7 @@
 # Résultats : stratégie A (aléatoire) contre stratégie B (boustrophédon + Nav2)
 
-Tous les chiffres viennent des CSV de `results/`, du résumé `results/summary.md` et du `docs/JOURNAL.md`.
+Tous les chiffres viennent des CSV de `results/`, du résumé `results/summary.md` et du `docs/JOURNAL.md`, sauf la section 4 bis, qui est un calcul hors ligne (signalé comme tel).
+**Méthode des « % à t s »** : partout, interpolation linéaire entre les deux points CSV voisins (fonction `cov_a` de `scripts/plot_results.py`).
 Les figures et le tableau sont produits par `scripts/plot_results.py`.
 
 ## 1. Protocole appliqué
@@ -10,14 +11,14 @@ Les figures et le tableau sont produits par `scripts/plot_results.py`.
 - **Durée** : 600 s simulées par run.
 - **Métrique commune** : le même nœud `coverage_tracker` pour A et B.
   - Dénominateur : un masque d'espace atteignable de 5564 cellules, soit 13.9 m².
-  - Une cellule est couverte quand le robot passe à moins du rayon de nettoyage (disque).
+  - Une cellule est couverte quand le robot passe à moins du rayon de nettoyage (disque). Rayon de 0.09 m demandé, arrondi à 2 cellules (0.10 m) par le code (disque de 13 cellules, bande nettoyée d'environ 0.25 m par passage).
   - La mesure démarre au premier déplacement du robot.
 - **Vitesse d'avance identique** : 0.15 m/s pour A et B.
 - **Stratégie A** : 3 runs, seeds 1, 2, 3, en mode **accéléré** (Gazebo sans limite de temps réel, sans fenêtres).
   - Ce mode a été validé par 5 critères fixés avant les runs (fréquences de `/scan` et `/cmd_vel`, vitesse moyenne, near_collisions, % final).
   - Les 5 critères sont satisfaits (`results/comparaison_vitesse/`). Les deux courbes, accélérée et temps réel, sont quasi superposées jusqu'à environ 5 min.
 - **Stratégie B** : 3 runs, seeds 1, 2, 3, en **temps réel**, configuration Nav2 finale appelée T5.
-  - Le mode accéléré a été testé et **invalidé** pour Nav2 (`results/comparaison_vitesse_B/`). Fréquence du contrôleur 4.42 Hz au lieu de 10 Hz, 8 waypoints atteints contre 69 en temps réel, 85 incidents contre 1.
+  - Le mode accéléré a été testé et **invalidé** pour Nav2 (`results/comparaison_vitesse_B/`). Fréquence du contrôleur 4.42 Hz contre 9.56 Hz en temps réel (10 Hz configurés), 8 waypoints atteints contre 69 en temps réel, 85 incidents contre 1.
   - Le critère « % final » seul paraissait bon (56.8 % contre 54.1 %). Il était trompeur : à 300 s, 53.6 % contre 29.0 %.
 - **Comparaison** : en temps simulé. Chaque stratégie est mesurée dans un mode dont le comportement en temps simulé a été vérifié.
 
@@ -67,18 +68,32 @@ Le run B3 s'arrête à 17.2 %. Sa couverture n'augmente plus après environ 158 
 
 ## 4. Interprétation (prudente)
 
-- **Début de run** : les courbes A et B sont quasi superposées jusqu'à environ 7 min.
+- **Début de run** : les courbes MOYENNES de A et de B restent à moins de 4 points l'une de l'autre jusqu'à 540 s, mais parce que B3 tire la moyenne de B vers le bas ; B1 et B2, eux, devancent la moyenne de A dès environ 4 min (détail ci-dessous).
 - **Fin de run** : sur ses deux runs complets, B passe devant (55.4 % et 59.8 %, contre 43.3 à 55.5 % pour A). L'écart apparaît tard dans le run.
-- **Sécurité** : B fait nettement moins de near_collisions (0 et 2) que A (21 à 32). C'est cohérent avec une trajectoire calculée sur la carte et un évitement d'obstacles par Nav2. A ne réagit qu'au dernier moment.
+- **Deux lectures des courbes, selon ce qu'on moyenne** :
+  - Les **moyennes** de A et de B (B avec B3) restent à moins de 4 points l'une de l'autre jusqu'à 540 s (écart maximal 3.8 points). C'est parce que B3, bloqué à 17.2 %, tire la moyenne de B vers le bas.
+  - Si l'on compare la moyenne de A à la moyenne de B1 et B2 seuls, B1 et B2 devancent la moyenne de A dès environ 4 min (à partir de 233 s, de façon durable) : +3.0 points à 300 s, +5.4 à 420 s, +10.8 à 480 s (+6.5 à 600 s). Ces écarts portent sur 2 runs de B contre 3 de A.
+- **Sécurité** : B fait nettement moins de near_collisions (0 et 2) que A (21 à 32). C'est cohérent avec une trajectoire calculée sur la carte et un évitement d'obstacles par Nav2. Hypothèse non vérifiée : A ne réagit qu'au dernier moment (il s'arrête à 0.25 m dans un cône de ±30°), alors que near_collisions compte les passages sous 0.15 m sur 360°. Les deux seuils et les deux secteurs diffèrent, donc la comparaison de ce compteur entre A et B reste indicative.
 - **Objectif non atteint** : aucune stratégie ne couvre 80 % en 10 min.
 - **Pas de conclusion statistique ferme** sur le % final. Avec n = 3 et une dispersion de B de 23.4 points, les intervalles de A et B se recouvrent largement.
 - **Régularité** : B1 et B2 ont des courbes presque identiques sur la majeure partie du run, car le trajet est planifié. A varie plus d'un run à l'autre en cours de route (par exemple à 420 s : 28.4 % pour A1 contre 40.3 % pour A3).
 - **Reproductibilité (observation sur la figure `results/coverage_vs_time_runs.png`, 2 runs)** : quand Nav2 fonctionne, B1 et B2 sont quasi superposées jusqu'à environ 8 min, alors que les runs de A divergent dès environ 2 min. Le balayage est déterministe, l'aléatoire ne l'est pas. La variance de B vient de la fiabilité (B3), pas de la stratégie. Cela reste une observation sur deux runs, pas une démonstration.
 - **Où B perd du temps** (analyse du journal, runs de réglage) :
-  - rotations sur place : environ 18 % du temps (18 à 20 % selon les essais) ;
+  - rotations sur place : environ 18 % du temps (T3 et T5, 600 s) ; 16 % sur T3 à 300 s ;
   - petits segments entre deux lignes de balayage, avec des arrêts d'environ 30 s ;
   - lignes de balayage coupées par les obstacles (le pilier), avec rotation puis contournement d'environ 13 s.
 - **Ce que A fait gratuitement** : pas de carte, pas de localisation, pas de planification. Il dépend de moins de composants, donc de moins de pannes. Sur les runs officiels, un run sur trois de B s'est bloqué de cette façon. Aucun run de A n'est documenté comme bloqué.
+
+## 4 bis. Pourquoi 80 % n'est pas atteint : borne optimiste calculée (pas une mesure)
+
+Calcul hors ligne avec `planning.py` sur `maps/world.pgm` : masque atteignable (5564 cellules), `boustrophedon_waypoints` (112 waypoints), puis marquage de la couverture le long des segments droits avec un rayon de 2 cellules. Le robot est supposé parfait : aucun détour, aucun arrêt, aucune rotation.
+
+- Un balayage idéal couvrirait 99.8 %.
+- Longueur du trajet idéal en lignes droites : 91.7 m, sans détours.
+- Il faut au moins 75.7 m de trajet pour atteindre 80 %, soit au moins 505 s de translation pure à 0.15 m/s.
+- À 70.2 m (distance parcourue par B1), la couverture idéale serait de 76.3 %, contre 59.8 % mesurés.
+
+Lecture prudente : avec 600 s et 0.15 m/s, la marge est faible même pour un robot parfait (90 m parcourables au maximum). Les rotations, les arrêts et les contournements mesurés en B, ainsi que les recouvrements de A, expliquent que 80 % ne soit pas atteint. Ce calcul est une borne, pas une mesure : il ne dit pas quelle part de l'écart vient de chaque cause.
 
 ## 5. Historique des réglages de B (démarche d'ingénierie)
 
@@ -90,7 +105,7 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 | T1 | `loop_rate` du waypoint_follower à 20 | 18.2 % | | surcharge CPU supprimée, comportement inchangé |
 | T2 | T1 + inflation 0.30 m, `cost_scaling` 10 | 21.9 % | | début plus rapide, mais blocage devant le pilier dès 177 s (DWB oscille) |
 | T3 | contrôleur Regulated Pure Pursuit, 0.15 m/s, rotation 1.0 rad/s | 28.5 % | 54.1 % | plus de blocage, 1 near_collision à 300 s |
-| T4 | T3 + contournements calculés par notre planner | 22.3 % | | **impasse** : 245 waypoints au lieu de 112, replanification à chaque but. Code conservé, désactivé |
+| T4 | T3 + contournements calculés par notre planner | 22.4 % | | **impasse** : 245 waypoints au lieu de 112, replanification à chaque but. Code conservé, désactivé |
 | T5 | T3 + ralentissement d'approche réduit (0.2 m), pause aux waypoints à 0 | 30.6 % | 59.7 % | gain net, **configuration retenue** |
 
 - T3 et T5 ont été comparés avec une seule seed chacun (seeds 1 et 5). La différence ne suffit pas à conclure statistiquement.
@@ -105,6 +120,7 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 - **Odométrie parfaite en simulation** : A ne dérive pas. En conditions réelles, A serait mesuré avec une dérive, donc moins fiable. Le TF statique `map → odom` de A suppose cette absence de dérive.
 - **Mesure de B sur la pose AMCL** : la position de B pour la couverture est estimée par AMCL, celle de A vient de l'odométrie simulée. Les deux sources n'ont pas la même erreur.
 - **Modes de simulation différents** : A en accéléré, B en temps réel. Chaque choix est justifié par une validation, mais ce n'est pas le même banc.
+- **Origine de la carte** : la TF `map → base_footprint` vaut environ (0.037, 0.009) m au départ (journal), car Cartographer prend son repère de suivi comme origine. Le décalage est d'environ 4 cm, inférieur à une cellule (5 cm).
 - **Discrétisation** : la carte a des cellules de 5 cm. L'espacement effectif des lignes de balayage de B est de 0.20 m, pour 0.18 m demandé.
 - **Blocage de la TF non diagnostiqué** : la cause du blocage de B3 est inconnue. Il peut se reproduire.
 - **Blocages au démarrage de Nav2** : l'executor est resté bloqué au démarrage 2 fois sur 5 lancements avant correctif (journal). Le correctif est validé seulement par les runs officiels.

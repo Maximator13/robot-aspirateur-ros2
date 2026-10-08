@@ -9,7 +9,7 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 |---|---|---|---|---|---|
 | J1-01 | Vérification de l'environnement (section 4) | chef de projet | — | Tableau rapporté à l'étudiant | FINI |
 | J1-02 | Mise en place : `git init`, `.gitignore`, squelette `aspi_bot` | chef de projet | — | Arborescence créée | FINI |
-| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + téléop) **depuis le spawn** | chef de projet (exploration par random_walker) | — | Carte fermée, visible dans RViz | FINI |
+| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + exploration par `random_walker`, au lieu de la téléop prévue) **depuis le spawn** | chef de projet (exploration par random_walker) | — | Carte fermée, visible dans RViz | FINI |
 | J1-04 | `planning.py` (masque libre, érosion, composante connexe, marquage de disque, % couvert, boustrophédon) + `random_logic.py` | ingénieur algorithmes | — | Python pur, importable sans ROS, docstrings | FINI |
 | J1-05 | `aspi_interfaces` (`CoverageStatus.msg`), `random_walker_node.py`, `coverage_tracker_node.py`, `rviz/aspi.rviz` | développeur ROS | contrats ci-dessous | `colcon build` OK | FINI |
 | J1-06 | État de l'art (`docs/ETAT_DE_L_ART.md`) | rédacteur technique | — | 6 approches, sources réelles | FINI |
@@ -40,6 +40,19 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 | J2-13 | Protocole B (600 s, 3 runs, temps réel, config T5) + comparaison A/B | ingénieur test + analyste résultats | J2-09, J2-12 | Courbe A vs B | FINI (A 51.0 ± 6.7 %, B 44.1 ± 23.4 % dont B3 bloqué) |
 | J2-10 | Journal du jour 2 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
 
+## Jour 3 — Évaluation et livrables (code gelé)
+
+Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de l'étudiant) : les figures de
+`results/` servent de captures de démo.
+
+| Id | Description | Responsable | Dépend de | Critère de fini | Statut |
+|---|---|---|---|---|---|
+| J3-01 | Audit de cohérence de tous les documents (chiffres identiques partout et conformes aux CSV, hypothèse ≠ fait, références) | relecteur | — | Liste d'écarts BLOQUANT / À CORRIGER | FINI (6 bloquants, ≈ 25 à corriger) |
+| J3-02 | Plan des slides (10 min, sans code) + préparation des questions du jury | rédacteur technique | — | `docs/PLAN_SOUTENANCE.md` | FINI |
+| J3-03 | `README.md` : construire, lancer A et B, tester, tracer les courbes | chef de projet | — | Commandes vérifiées | FINI |
+| J3-04 | Corrections issues de l'audit, par les propriétaires des fichiers | propriétaires des fichiers | J3-01 | Aucun écart restant | FINI |
+| J3-05 | Journal du jour 3 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
+
 ### Contrats jour 2 (fixés par l'architecte)
 
 - **`coverage_planner`** — paramètres : `robot_radius` (0.105), `safety_margin` (0.05), `sweep_spacing` (0.18),
@@ -50,10 +63,12 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 - **`coverage_planner` (ajout jour 2)** — `plan_transitions` (False : essai T4 négatif), `transition_step` (0.3 m).
 - **`coverage_executor`** — paramètres : `initial_x` (0.0), `initial_y` (0.0), `initial_yaw` (0.0),
   `max_duration` (0.0 = illimité ; le launch le règle à `run_duration + 10` s : arrêt propre après la mesure).
-  Structure simple et séquentielle (pas de callback bloquant) : `BasicNavigator` → attendre `/coverage_path`
-  (spin_once) → `setInitialPose` → `waitUntilNav2Active()` → `followWaypoints(poses)` → boucle
-  `isTaskComplete()` avec log de progression → résultat + `missed_waypoints` loggués. Horodatage via l'horloge
-  du nœud (sim time).
+  Structure séquentielle (pas de callback bloquant) : `BasicNavigator` → attendre `/coverage_path` → pose initiale
+  → attente de Nav2 **avec délais** (amcl actif → pose initiale republiée jusqu'à `/amcl_pose` → bt_navigator actif
+  → waypoint_follower actif → serveur d'action prêt ; `waitUntilNav2Active` n'est PAS utilisé : attente sans délai,
+  voir JOURNAL) → `followWaypoints` (5 essais si refus) → boucle de suivi `spin_once` + test du résultat (pas
+  `isTaskComplete`, fuite mémoire, voir JOURNAL) ; sorties : but terminé, `max_duration`, serveur perdu depuis 3 s
+  (temps monotone), arrêt. Waypoints manqués loggués.
 - **Nav2** : `waypoint_follower.stop_on_failure: false` (waypoint inaccessible = sauté, conforme au brief).
   Tolérance d'arrivée `xy_goal_tolerance` abaissée de 0.25 à 0.15 m : avec un espacement de balayage de 0.18 m,
   0.25 m permettrait de « couper » les extrémités des lignes.
@@ -111,7 +126,7 @@ Rotation **en temps** (pas d'odométrie) : le nœud n'a besoin que de `/scan` et
 | Nœud | Paramètres (défaut) |
 |---|---|
 | `random_walker` | `seed` (1), `forward_speed` (0.15), `turn_speed` (1.0), `stop_distance` (0.25), `front_angle_deg` (30.0), `control_rate` (10.0) |
-| `coverage_tracker` | `strategy` ("RANDOM"), `seed` (0), `robot_radius` (0.105), `safety_margin` (0.05), `cleaning_radius` (0.09), `near_collision_distance` (0.15), `pose_rate` (10.0), `run_duration` (600.0), `output_dir` ("~/ros2_ws/results"), `map_frame` ("map"), `base_frame` ("base_footprint") |
+| `coverage_tracker` | `strategy` ("RANDOM"), `seed` (0), `start_motion_threshold` (0.01), `robot_radius` (0.105), `safety_margin` (0.05), `cleaning_radius` (0.09), `near_collision_distance` (0.15), `pose_rate` (10.0), `run_duration` (600.0), `output_dir` ("~/ros2_ws/results"), `map_frame` ("map"), `base_frame` ("base_footprint") |
 
 **Décision `near_collision_distance`** : le LiDAR simulé a `range_min = 0.12 m` > `robot_radius = 0.105 m`,
 donc « obstacle < robot_radius » vaudrait toujours 0. Seuil paramétrable à 0.15 m, compté sur **front montant**

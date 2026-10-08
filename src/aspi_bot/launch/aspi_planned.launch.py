@@ -53,9 +53,10 @@ def generate_launch_description():
         DeclareLaunchArgument('headless', default_value='false',
                               description='true : ni gzclient ni RViz'),
         DeclareLaunchArgument('fast', default_value='false',
-                              description='true : simulation accélérée (à valider pour Nav2)'),
+                              description='true : simulation accélérée (INVALIDÉE pour Nav2 : '
+                                          'ne pas utiliser pour les mesures, voir JOURNAL)'),
         # Désactivé par défaut : essai T4 négatif (avec RPP, Nav2 contourne déjà les obstacles ;
-        # les waypoints intermédiaires multiplient les arrêts : 22.3 % contre 28.5 % à 300 s).
+        # les waypoints intermédiaires multiplient les arrêts : 22.4 % contre 28.5 % à 300 s).
         DeclareLaunchArgument('plan_transitions', default_value='false',
                               description='true : contournements calculés dans le masque atteignable '
                                           'entre deux segments séparés par un obstacle'),

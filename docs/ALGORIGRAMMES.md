@@ -89,7 +89,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A(["Masque atteignable, origine, résolution, espacement 0.18 m"]) --> B["espacement en cellules = 0.18 / résolution, arrondi, au moins 1"]
+    A(["Masque atteignable, origine, résolution, espacement 0.18 m"]) --> B["espacement en cellules = 0.18 / résolution, arrondi, au moins 1<br/>0.18 / 0.05 donne 4 cellules = 0.20 m"]
     B --> C{"le masque contient<br/>des cellules ?"}
     C -- "non" --> VIDE(["aucun waypoint"])
     C -- "oui" --> D["lignes de balayage horizontales<br/>espacées d'une valeur constante<br/>bloc de lignes centré entre bas et haut de la zone"]
@@ -134,7 +134,7 @@ flowchart TD
 ```
 
 - Une seule publication par carte reçue. Le QoS TRANSIENT_LOCAL permet à l'executor, lancé en même temps, de recevoir le trajet même s'il s'abonne après.
-- Pointillés : `plan_transitions` est une option de launch, désactivée. Essai T4 négatif : 112 devient 245 waypoints, mais la couverture à 300 s tombe à 22.3 % contre 28.5 % (Nav2 avec Regulated Pure Pursuit contourne déjà les obstacles ; les points intermédiaires multiplient arrêts et rotations).
+- Pointillés : `plan_transitions` est une option de launch, désactivée. Essai T4 négatif : 112 devient 245 waypoints, mais la couverture à 300 s tombe à 22.4 % contre 28.5 % (Nav2 avec Regulated Pure Pursuit contourne déjà les obstacles ; les points intermédiaires multiplient arrêts et rotations).
 - Le code est conservé et testé (8 tests unitaires) : une impasse documentée.
 
 ---
@@ -190,7 +190,7 @@ flowchart TD
 - Ordre voulu : la pose initiale est republiée tant qu'AMCL n'a pas répondu, car chaque publication réinitialise le filtre ; l'intervalle d'environ 1 s laisse à AMCL le temps de répondre.
 - `waypoint_follower` est activé en dernier par le lifecycle manager. Son serveur d'action doit être visible avant l'envoi, sinon le but est rejeté. C'est aussi pourquoi l'envoi autorise jusqu'à 5 essais.
 - Raison de la réécriture : `BasicNavigator` n'a pas de délai d'attente. Un blocage a été observé sur 2 lancements sur 5, avec le message « amcl: failed to send response to /amcl/get_state (timeout) ». Voir JOURNAL, « Incident : Nav2 bloqué à l'attente d'activation » et « Correctif : blocage de l'executor au démarrage ».
-- Limite connue : l'attente d'acceptation du but dans `followWaypoints` reste sans délai (bibliothèque). Correctif à valider pendant les runs officiels.
+- Limite connue : l'attente d'acceptation du but dans `followWaypoints` reste sans délai (bibliothèque). Correctif validé : 3 démarrages sur 3 conformes, puis les 3 runs officiels de B.
 
 ### 3.3 Boucle de suivi
 
@@ -238,7 +238,7 @@ flowchart TD
     H -- "non, le robot n'a pas bougé" --> FIN1
     H -- "oui" --> I["début de la mesure :<br/>mémoriser le temps simulé<br/>ouvrir le CSV"]
     I --> J["distance = distance + déplacement depuis la dernière pose"]
-    J --> K["marquer couvertes les cellules d'un disque de 0.09 m<br/>autour du robot, limité au masque atteignable"]
+    J --> K["marquer couvertes les cellules d'un disque<br/>0.09 m demandé, arrondi à 2 cellules = 0.10 m<br/>autour du robot, limité au masque atteignable"]
     K --> FIN2(["fin du tick"])
 
     S(["Message LaserScan"]) --> S1{"mesure démarrée<br/>et non terminée ?"}
