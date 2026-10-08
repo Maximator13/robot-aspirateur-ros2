@@ -4,7 +4,8 @@ Lance : Gazebo (turtlebot3_world) + map_server (carte de référence, vérité t
 + TF statique identité map -> odom + random_walker + coverage_tracker + RViz.
 
 Le robot n'utilise PAS la carte : elle sert uniquement au tracker pour calculer le % couvert.
-Hypothèse : la carte a été construite depuis la position de spawn, donc map == odom au départ
+Hypothèse : la carte a été construite depuis la position de spawn, donc l'origine de map = spawn ;
+odom (Gazebo) est en coordonnées monde -> map -> odom = translation de -spawn
 (dérive d'odométrie négligée en simulation — limite notée dans le journal).
 
 Exemple : ros2 launch aspi_bot aspi_random.launch.py seed:=2
@@ -16,7 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -29,6 +30,8 @@ def generate_launch_description():
     map_yaml = LaunchConfiguration('map')
     run_duration = LaunchConfiguration('run_duration')
     use_rviz = LaunchConfiguration('use_rviz')
+    spawn_x = LaunchConfiguration('spawn_x')
+    spawn_y = LaunchConfiguration('spawn_y')
     sim = {'use_sim_time': True}
 
     args = [
@@ -39,12 +42,16 @@ def generate_launch_description():
         DeclareLaunchArgument('run_duration', default_value='600.0',
                               description='Durée du run en secondes simulées'),
         DeclareLaunchArgument('use_rviz', default_value='true'),
+        # Position de spawn dans le monde Gazebo (= origine de la carte de référence)
+        DeclareLaunchArgument('spawn_x', default_value='-2.0'),
+        DeclareLaunchArgument('spawn_y', default_value='-0.5'),
     ]
 
     # Monde + robot (le launch TurtleBot3 inclut robot_state_publisher en sim time)
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(tb3_gazebo_dir, 'launch', 'turtlebot3_world.launch.py')))
+            os.path.join(tb3_gazebo_dir, 'launch', 'turtlebot3_world.launch.py')),
+        launch_arguments={'x_pose': spawn_x, 'y_pose': spawn_y}.items())
 
     # Carte de référence : map_server est un nœud lifecycle, activé par le lifecycle_manager
     map_server = Node(
@@ -55,10 +62,15 @@ def generate_launch_description():
         name='lifecycle_manager_map', output='screen',
         parameters=[sim, {'autostart': True, 'node_names': ['map_server']}])
 
-    # Pas de localisation en stratégie A : on pose map == odom
+    # Pas de localisation en stratégie A : TF statique map -> odom.
+    # Le plugin diff_drive de Gazebo publie odom dans le repère du MONDE (robot en
+    # (-2.0, -0.5) au spawn), alors que la carte a son origine au spawn :
+    # map -> odom est donc une translation de -spawn (et non l'identité).
     map_to_odom = Node(
         package='tf2_ros', executable='static_transform_publisher', name='map_to_odom',
-        arguments=['--frame-id', 'map', '--child-frame-id', 'odom'],
+        arguments=['--x', PythonExpression(['-(', spawn_x, ')']),
+                   '--y', PythonExpression(['-(', spawn_y, ')']),
+                   '--frame-id', 'map', '--child-frame-id', 'odom'],
         parameters=[sim])
 
     walker = Node(
