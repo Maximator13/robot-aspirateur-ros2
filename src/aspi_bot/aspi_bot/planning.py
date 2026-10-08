@@ -160,6 +160,34 @@ def reachable_mask(free, start_cell, resolution, robot_radius=0.105, safety_marg
     return connected_component(eroded, (row, col))
 
 
+def restrict_to_rect(free, origin_x, origin_y, resolution, rect):
+    """Restreint un masque aux cellules dont le CENTRE est dans un rectangle (repère map).
+
+    rect = (xmin, ymin, xmax, ymax) en mètres, bords compris ; None ou [] -> copie
+    de `free` inchangée (pas de restriction). Sert au keepout du robot réel : planner
+    et tracker l'appliquent tous les deux, donc le balayage et le dénominateur du %
+    couvert portent sur la même zone. Appliqué AVANT reachable_mask, le bord du
+    rectangle se comporte comme un mur (érodé de la marge du robot).
+    Principe : coordonnées des centres de colonnes / lignes, deux tests 1D combinés
+    par produit extérieur. Complexité O(N). Rectangle mal formé -> ValueError.
+    """
+    free = np.asarray(free, dtype=bool)
+    if rect is None or len(rect) == 0:
+        return free.copy()
+    if len(rect) != 4:
+        raise ValueError('rect doit contenir 4 valeurs (xmin, ymin, xmax, ymax)')
+    xmin, ymin, xmax, ymax = (float(v) for v in rect)
+    if not (xmin < xmax and ymin < ymax):
+        raise ValueError('rect invalide : il faut xmin < xmax et ymin < ymax')
+    height, width = free.shape
+    # Centres des cellules : colonne -> x, ligne -> y (ligne 0 = bas de la carte).
+    xs = origin_x + (np.arange(width) + 0.5) * resolution
+    ys = origin_y + (np.arange(height) + 0.5) * resolution
+    cols_in = (xs >= xmin) & (xs <= xmax)
+    rows_in = (ys >= ymin) & (ys <= ymax)
+    return free & np.outer(rows_in, cols_in)
+
+
 # ---------------------------------------------------------------------------
 # Mesure de couverture (tracker)
 # ---------------------------------------------------------------------------

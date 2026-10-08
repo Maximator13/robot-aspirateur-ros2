@@ -370,3 +370,43 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** (décision de l'étudiant) : pas de vidéo. Les figures de `results/` (couverture en fonction du temps, courbes par run) servent de captures de démo.
 - **Justification** : choix de l'étudiant.
 - **Résultat-leçon** : code gelé. Le jour 3 ne contient que l'audit de cohérence des documents, le plan des slides avec la préparation des questions du jury, et un README d'utilisation.
+
+### 2026-10-08 · Préparation du robot réel (bonus), sans robot
+
+- **Contexte** : séance prévue à l'école avec un TurtleBot3 Burger réel. Le robot n'est pas disponible pour l'instant : la préparation est testée uniquement en simulation.
+- **Options envisagées** :
+  - zone de test : murs en carton (plan principal) ; barrière virtuelle en repère odom (en option) ; keepout filter de Nav2 pour la stratégie B (en option) ;
+  - mesure de la stratégie A : localisation AMCL (utilisée pour la mesure seulement) ou TF statique `map → odom` en repli.
+- **Choix** :
+  - deux launch sans Gazebo : `aspi_real_random` et `aspi_real_planned`, avec `use_sim_time` à false par défaut (true pour les tester avec Gazebo) ;
+  - vitesses réduites : 0.10 m/s en translation, 0.6 rad/s en rotation ;
+  - `near_collision_distance` = 0.20 m ;
+  - mesure de A via AMCL, TF statique en repli ; zone limitée par des murs en carton ;
+  - CSV du robot dans `results/robot_reel/` ;
+  - procédure réseau WSL2 et checklist dans `docs/JOUR_ROBOT.md`. Aucune modification de `.bashrc` ni de `.wslconfig`.
+- **Justification** : le LDS-02 a une portée minimale d'environ 0.16 m. Avec 0.15 m, la métrique serait toujours nulle, même piège qu'au jour 1. Le seuil de 0.20 m est au-dessus de cette portée minimale.
+- **Résultat-leçon** : résultats des tests en simulation :
+  - barrière A : le robot reste dans le rectangle ; arrêt à environ 0.25 m avant le bord, dépassement maximal d'environ 0.13 m ;
+  - stratégie B à 0.10 m/s : 12.2 % de couverture en 120 s ;
+  - keepout : fonctionne, mais un départ sur le bord de la zone autorisée empêche tout mouvement (collision détectée dès le premier pas, 75 messages « patience exceeded ») ;
+  - avec une marge de 0.5 m autour du départ : 30.7 % en 120 s, et le robot reste dans la zone. Le script de masque refuse désormais une zone sans marge de 0.5 m autour du départ.
+
+### 2026-10-08 · Sécurité : un Ctrl+C n'arrêtait pas le robot
+
+- **Contexte** : en test avec Gazebo, après Ctrl+C du launch, le `random_walker` s'arrêtait sans publier de vitesse nulle. La dernière consigne (0.10 m/s) restait appliquée et le robot continuait tout droit. Le TurtleBot3 réel garde aussi la dernière consigne reçue.
+- **Options envisagées** : correctif dans le nœud ; procédure seule (Ctrl+C puis arrêt manuel). La procédure a été conservée en complément du correctif.
+- **Choix** : rclpy initialisé sans gestionnaire de signal ; 5 vitesses nulles publiées à l'arrêt ; SIGTERM traité comme Ctrl+C. Procédure : Ctrl+C puis toujours `stop_robot.sh`.
+- **Justification** : le gestionnaire de signal de rclpy ferme le contexte avant le bloc d'arrêt, donc la publication de la vitesse nulle était sautée. Le même mécanisme avait déjà causé un bug dans l'executor.
+- **Résultat-leçon** : vérifié avec Gazebo : vitesse nulle 70 ms après Ctrl+C, robot arrêté en moins de 1 s ; idem avec SIGTERM. En cours suite à la revue de code : second Ctrl+C ignoré pendant l'arrêt ; arrêt si `/scan` (ou `/odom`) n'arrive plus depuis 0.5 s ; arrêt propre du tracker. Leçon : la sécurité d'un robot réel se teste, elle ne se suppose pas.
+
+### 2026-10-08 · Limites connues pour le robot réel
+
+- **Contexte** : limites identifiées pendant la préparation de la séance, à présenter au jury et à respecter pendant les essais.
+- **Options envisagées** : non applicable (constat).
+- **Choix** : limites documentées ; procédure `stop_robot.sh` systématique après Ctrl+C.
+- **Justification** : ces limites viennent de l'architecture (lien réseau, capteur, odométrie) et ne se corrigent pas par le code seul.
+- **Résultat-leçon** :
+  - si le lien PC–robot tombe, rien côté PC ne peut arrêter le robot ;
+  - les obstacles sous la portée minimale du LiDAR sont invisibles ;
+  - la barrière virtuelle (odom) glisse avec la dérive d'odométrie ;
+  - avec la stratégie B, une dernière consigne de Nav2 peut rester appliquée après Ctrl+C, d'où l'arrêt systématique par `stop_robot.sh`.

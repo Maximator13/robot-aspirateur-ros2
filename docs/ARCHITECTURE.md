@@ -323,3 +323,60 @@ Détails : `docs/JOURNAL.md`, entrées « Décision : simulation accélérée »
 - **Rotation du random_walker en temps.** Le nœud n'a que `/scan` en entrée, avec l'horloge simulée.
 - **Carte figée au premier `/map`.** La vérité terrain ne change pas pendant un run.
 - **Simulation commune.** `sim.launch.py` évite toute divergence de monde ou de robot entre A et B.
+
+---
+
+## 7. Robot réel (préparation)
+
+Non encore exécuté sur le robot : section écrite d'après les launch `aspi_real_random.launch.py` et `aspi_real_planned.launch.py`.
+
+**Répartition.** Pas de Gazebo ni de `sim.launch.py`.
+
+- Le robot exécute `turtlebot3_bringup robot.launch.py`. Il publie `/scan`, `/odom` et la TF `odom → base_footprint`.
+- Le PC exécute nos nœuds, Nav2 et RViz. Les deux machines se parlent par DDS.
+- `use_sim_time` vaut `false` par défaut.
+- Les CSV vont dans `results/robot_reel/`.
+- Vitesse réduite à 0.10 m/s.
+
+**Stratégie A (`aspi_real_random.launch.py`).**
+
+- `random_walker` lit `/scan`. Il lit aussi `/odom` (`nav_msgs/msg/Odometry`) uniquement si la barrière `fence` est active. La barrière est un rectangle en repère odom.
+- La mesure a besoin de la TF `map → odom`. Argument `localization` :
+  - `amcl` (défaut) : `map_server` + AMCL via `localization_launch.py`, pose initiale (0, 0, 0) ;
+  - `static` : TF statique identité en repli.
+- Le robot n'utilise pas la carte : elle ne sert qu'à la mesure.
+
+**Stratégie B (`aspi_real_planned.launch.py`).**
+
+- Nav2 complet (`bringup_launch.py`) avec `nav2_params_real.yaml` (0.10 m/s).
+- Keepout optionnel (`keepout:=true`) :
+  - `filter_mask_server` publie `/keepout_filter_mask` (`nav_msgs/msg/OccupancyGrid`) ;
+  - `costmap_filter_info_server` publie `/costmap_filter_info` (`nav2_msgs/msg/CostmapFilterInfo`) ;
+  - le plugin `KeepoutFilter` est activé dans les deux costmaps ;
+  - un `lifecycle_manager_keepout` active les deux serveurs.
+- `allowed_area` (repère map) restreint le balayage du planner ET la mesure du tracker. Sans cela, des waypoints tomberaient dans la zone interdite.
+
+```mermaid
+flowchart LR
+    subgraph ROBOT["Robot (Raspberry Pi)"]
+        BR["turtlebot3_bringup<br/>robot.launch.py"]
+    end
+    subgraph PC["PC (WSL)"]
+        RW["random_walker (A)"]
+        LOC["map_server + AMCL<br/>ou TF statique map→odom"]
+        N2["Nav2 + planner + executor (B)"]
+        KO["filter_mask_server +<br/>costmap_filter_info_server<br/>(keepout, option B)"]
+        TR["coverage_tracker"]
+    end
+    BR -->|"/scan LaserScan"| RW
+    BR -->|"/odom Odometry<br/>(si fence)"| RW
+    RW -->|"/cmd_vel Twist"| BR
+    BR -->|"/scan, /odom,<br/>TF odom→base_footprint"| N2
+    N2 -->|"/cmd_vel Twist"| BR
+    KO -->|"/keepout_filter_mask OccupancyGrid<br/>/costmap_filter_info CostmapFilterInfo"| N2
+    LOC -->|"TF map→odom"| TR
+    N2 -->|"TF map→odom (AMCL)"| TR
+    BR -->|"/scan, TF odom→base_footprint"| TR
+```
+
+Dans la stratégie B, la TF `map → odom` vient de l'AMCL de Nav2 ; dans la stratégie A, de `LOC`. Le tracker, commun, lit `/scan` et la TF.

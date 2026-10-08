@@ -5,6 +5,7 @@ Pose via TF map -> base_footprint, marque les cellules nettoyées, publie
 """
 import math
 import os
+import signal
 from datetime import datetime
 
 import numpy as np
@@ -16,11 +17,13 @@ from rclpy.node import Node
 from rclpy.qos import (QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy,
                        qos_profile_sensor_data)
 from sensor_msgs.msg import LaserScan
+from rclpy.parameter import Parameter
+from rclpy.signals import SignalHandlerOptions
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from aspi_bot.planning import (coverage_percent, mark_covered,
                                occupancy_to_free, reachable_mask,
-                               world_to_cell)
+                               restrict_to_rect, world_to_cell)
 
 
 class CoverageTrackerNode(Node):
@@ -38,6 +41,14 @@ class CoverageTrackerNode(Node):
         self.map_frame = p('map_frame').value
         self.base_frame = p('base_frame').value
         self.start_motion_threshold = p('start_motion_threshold').value
+        # allowed_area validée une seule fois ici (comme le planner)
+        self.allowed_area = [float(v) for v in (self.get_parameter_or('allowed_area').value or [])]
+        if self.allowed_area:
+            if len(self.allowed_area) != 4:
+                raise ValueError('allowed_area doit contenir 4 valeurs : xmin ymin xmax ymax')
+            xmin, ymin, xmax, ymax = self.allowed_area
+            if not (xmin < xmax and ymin < ymax):
+                raise ValueError('allowed_area invalide : il faut xmin < xmax et ymin < ymax')
 
         # État de la mesure
         self.map_msg = None
@@ -85,6 +96,9 @@ class CoverageTrackerNode(Node):
                 ('map_frame', 'map'), ('base_frame', 'base_footprint'),
                 ('start_motion_threshold', 0.01)]:
             self.declare_parameter(name, default)
+        # Zone autorisée [xmin, ymin, xmax, ymax] en repère map ; [] = toute la carte
+        self.declare_parameter(
+            'allowed_area', Parameter.Type.DOUBLE_ARRAY)
 
     def open_csv(self):
         """Ouvre le CSV au début effectif de la mesure (pas de CSV vide)."""
@@ -145,6 +159,10 @@ class CoverageTrackerNode(Node):
         info = self.map_msg.info
         free = occupancy_to_free(
             self.map_msg.data, info.width, info.height)
+        if self.allowed_area:  # même restriction que le planner (avant reachable_mask)
+            free = restrict_to_rect(
+                free, info.origin.position.x, info.origin.position.y,
+                info.resolution, self.allowed_area)
         start = world_to_cell(
             x, y, info.origin.position.x, info.origin.position.y,
             info.resolution)
@@ -243,15 +261,26 @@ class CoverageTrackerNode(Node):
             self.csv_file.close()
 
 
+def _sigterm_vers_interruption(signum, frame):
+    # SIGTERM (ros2 launch) traité comme un Ctrl+C : même arrêt propre
+    raise KeyboardInterrupt
+
+
 def main(args=None):
-    rclpy.init(args=args)
+    # SignalHandlerOptions.NO : Python lève KeyboardInterrupt, le contexte reste valide
+    # pendant le finally (fermeture du CSV, destroy_node).
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+    signal.signal(signal.SIGTERM, _sigterm_vers_interruption)
     node = CoverageTrackerNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.close_csv()
+        # Un 2e Ctrl+C ou SIGTERM ne doit pas interrompre la fermeture du CSV ni destroy_node.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        node.close_csv()  # avant destroy_node ; close() flush
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

@@ -53,6 +53,39 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
 | J3-04 | Corrections issues de l'audit, par les propriétaires des fichiers | propriétaires des fichiers | J3-01 | Aucun écart restant | FINI |
 | J3-05 | Journal du jour 3 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
 
+## Préparation du robot réel (bonus, sans robot)
+
+| Id | Description | Responsable | Dépend de | Critère de fini | Statut |
+|---|---|---|---|---|---|
+| R-01 | Barrière virtuelle (rectangle en repère odom) : fonction pure dans `random_logic.py` | ingénieur algorithmes | — | Python pur, testable | FINI |
+| R-02 | `random_walker` : abonnement `/odom` + paramètre `fence` (désactivé par défaut) ; `config/nav2_params_real.yaml` ; keepout filter Nav2 (masque + config) ; script d'arrêt | développeur ROS | R-01 (contrat) | build OK | FINI |
+| R-03 | `aspi_real_random.launch.py`, `aspi_real_planned.launch.py` (sans Gazebo, `use_sim_time` false par défaut) | chef de projet | R-02 | Launch valides | FINI |
+| R-04 | `docs/JOUR_ROBOT.md` : réseau WSL2 (procédure seulement), plan B partage de connexion, checklist du jour | rédacteur technique | — | Commandes exactes, quoi faire si échec | FINI |
+| R-05 | Tests en simulation de tout ce qui peut l'être (launch réels avec `use_sim_time:=true` + Gazebo, barrière, keepout) + tests pytest | ingénieur test | R-01..R-03 | Résultats rapportés | FINI |
+| R-06 | Revue | relecteur | R-01..R-05 | Aucun BLOQUANT | FINI |
+| R-07 | Journal + commit | opérateur / scribe, chef de projet | toutes | Entrée au journal | FINI |
+
+### Contrats robot réel (fixés par l'architecte)
+
+- **Sécurité** : vitesse d'avance par défaut 0.10 m/s (A : `forward_speed`, B : RPP `desired_linear_vel`), rotation 0.6 rad/s.
+  Arrêt : Ctrl+C du launch (le `random_walker` publie un Twist nul à l'arrêt ; l'executor annule le but) puis
+  `scripts/stop_robot.sh` (publie un Twist nul sur `/cmd_vel` plusieurs fois).
+- **LiDAR** : LDS-01 `range_min` 0.12 m, LDS-02 ≈ 0.16 m → `near_collision_distance` 0.20 m sur le robot réel
+  (sinon métrique toujours nulle avec un LDS-02, même piège qu'au jour 1).
+- **Barrière virtuelle A** — `random_logic.fence_distance_ahead(x, y, yaw, fence, front_angle) -> float` :
+  `fence = (xmin, ymin, xmax, ymax)` en repère odom ; robot DANS le rectangle → distance minimale au bord le long de
+  rayons du secteur avant [-front_angle, +front_angle] ; robot HORS du rectangle → 0.0 s'il s'éloigne du centre
+  (force un virage), inf s'il revient vers le centre (|écart de cap vers le centre| < 90°). Le nœud prend
+  `min(distance LiDAR, distance barrière)`. Paramètre `fence` = [] (désactivé) par défaut.
+- **Mesure A sur le robot réel** : la carte sert de vérité terrain ; `map → odom` vient d'AMCL (localisation seule,
+  pose initiale (0, 0, 0) fixée par paramètre) — le robot, lui, n'utilise pas la carte. Repli : TF statique identité
+  (`localization:=static`) si AMCL pose problème (odométrie réelle qui dérive : limite).
+- **Keepout B** : masque `maps/keepout.{yaml,pgm}` généré à partir de la carte et d'un rectangle autorisé
+  (`scripts/make_keepout_mask.py`) ; `costmap_filter_info_server` + `map_server` du masque ; plugin
+  `nav2_costmap_2d::KeepoutFilter` dans les costmaps global et local ; désactivé par défaut (`keepout:=false`).
+  Le planner de couverture doit aussi exclure la zone interdite (même rectangle passé en paramètre, sinon des
+  waypoints tomberaient dans la zone).
+
 ### Contrats jour 2 (fixés par l'architecte)
 
 - **`coverage_planner`** — paramètres : `robot_radius` (0.105), `safety_margin` (0.05), `sweep_spacing` (0.18),

@@ -4,6 +4,7 @@ Interface fine et séquentielle : /coverage_path -> setInitialPose ->
 wait_nav2_active -> followWaypoints -> suivi de la progression.
 """
 import math
+import signal
 import time
 
 import rclpy
@@ -263,6 +264,13 @@ def run(nav):
                  f'{missed if missed else ""}')
 
 
+def _ignorer_signaux():
+    # Un 2e Ctrl+C ou le SIGTERM de launch ne doit pas interrompre l'annulation
+    # du but Nav2 ni la destruction du nœud.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+
 def main(args=None):
     # SignalHandlerOptions.NO : rclpy n'installe pas son gestionnaire SIGINT
     # (qui éteindrait le contexte et ferait tourner à vide les boucles de
@@ -281,11 +289,13 @@ def main(args=None):
         # Arrêt demandé (SIGINT) : le contexte rclpy peut déjà être détruit.
         # On n'annule la tâche Nav2 que s'il est encore utilisable
         # (cancel_task gère elle-même un 2e Ctrl+C).
+        _ignorer_signaux()
         if rclpy.ok():
             cancel_task(nav)
         else:
             nav.get_logger().info('Arrêt demandé : contexte ROS déjà fermé')
     finally:
+        _ignorer_signaux()
         try:
             nav.destroy_node()
         except Exception:

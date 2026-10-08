@@ -6,6 +6,7 @@ Une publication par carte reçue.
 import math
 
 import rclpy
+from rclpy.parameter import Parameter
 from rclpy.executors import ExternalShutdownException
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
@@ -39,6 +40,13 @@ class CoveragePlanner(Node):
         self.plan_transitions = self.declare_parameter('plan_transitions', False).value
         self.transition_step = self.declare_parameter('transition_step', 0.3).value
 
+        # Zone autorisée [xmin, ymin, xmax, ymax] en repère map ; [] = toute la carte
+        self.declare_parameter(
+            'allowed_area', Parameter.Type.DOUBLE_ARRAY)
+        self.allowed_area = [float(v) for v in (self.get_parameter_or('allowed_area').value or [])]
+        if self.allowed_area and len(self.allowed_area) != 4:
+            raise ValueError('allowed_area doit contenir 4 valeurs : xmin ymin xmax ymax')
+
         self.path_pub = self.create_publisher(Path, '/coverage_path', LATCHED_QOS)
         self.create_subscription(OccupancyGrid, '/map', self.on_map, LATCHED_QOS)
         self.get_logger().info('coverage_planner prêt, en attente de /map')
@@ -46,6 +54,18 @@ class CoveragePlanner(Node):
     def on_map(self, msg):
         info = msg.info
         free = planning.occupancy_to_free(msg.data, info.width, info.height)
+        if self.allowed_area:  # même restriction que le tracker (avant reachable_mask)
+            free = planning.restrict_to_rect(
+                free, info.origin.position.x, info.origin.position.y,
+                info.resolution, self.allowed_area)
+            xmin, ymin, xmax, ymax = self.allowed_area
+            bord = min(self.start_x - xmin, xmax - self.start_x,
+                       self.start_y - ymin, ymax - self.start_y)
+            if bord < 0.5:  # mesuré : départ au bord -> le robot ne bouge jamais
+                self.get_logger().error(
+                    f'Départ ({self.start_x}, {self.start_y}) à {bord:.2f} m du bord de '
+                    'allowed_area (ou dehors) : moins de 0.5 m de marge, le robot risque '
+                    'de ne pas bouger (collision détectée dès le premier pas)')
         start = planning.world_to_cell(self.start_x, self.start_y,
                                        info.origin.position.x, info.origin.position.y,
                                        info.resolution)
