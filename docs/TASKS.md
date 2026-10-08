@@ -9,16 +9,19 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 |---|---|---|---|---|---|
 | J1-01 | Vérification de l'environnement (section 4) | chef de projet | — | Tableau rapporté à l'étudiant | FINI |
 | J1-02 | Mise en place : `git init`, `.gitignore`, squelette `aspi_bot` | chef de projet | — | Arborescence créée | FINI |
-| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + téléop) **depuis le spawn** | **étudiant** | — | Carte fermée, visible dans RViz | À FAIRE |
-| J1-04 | `planning.py` (masque libre, érosion, composante connexe, marquage de disque, % couvert, boustrophédon) + `random_logic.py` | ingénieur algorithmes | — | Python pur, importable sans ROS, docstrings | EN COURS |
-| J1-05 | `aspi_interfaces` (`CoverageStatus.msg`), `random_walker_node.py`, `coverage_tracker_node.py`, `rviz/aspi.rviz` | développeur ROS | contrats ci-dessous | `colcon build` OK | EN COURS |
-| J1-06 | État de l'art (`docs/ETAT_DE_L_ART.md`) | rédacteur technique | — | 6 approches, sources réelles | EN COURS |
-| J1-07 | Tests pytest de `planning.py` et `random_logic.py` | ingénieur test | J1-04 | `pytest` vert | À FAIRE |
-| J1-08 | `launch/aspi_random.launch.py` | chef de projet | J1-03, J1-05 | Lance Gazebo + map_server + TF + nœuds + RViz | À FAIRE |
-| J1-09 | Revue de J1-04/05/07/08 | relecteur | J1-04..08 | Aucun BLOQUANT | À FAIRE |
-| J1-10 | Premier run A (seed 1), premier CSV | ingénieur test | J1-09 | CSV dans `results/` | À FAIRE |
-| J1-11 | `scripts/plot_results.py`, première courbe | analyste résultats | J1-10 | `results/coverage_vs_time.png` | À FAIRE |
-| J1-12 | Journal du jour 1 | opérateur / scribe | toutes | Entrées au format du brief | EN COURS |
+| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + téléop) **depuis le spawn** | chef de projet (exploration par random_walker) | — | Carte fermée, visible dans RViz | FINI |
+| J1-04 | `planning.py` (masque libre, érosion, composante connexe, marquage de disque, % couvert, boustrophédon) + `random_logic.py` | ingénieur algorithmes | — | Python pur, importable sans ROS, docstrings | FINI |
+| J1-05 | `aspi_interfaces` (`CoverageStatus.msg`), `random_walker_node.py`, `coverage_tracker_node.py`, `rviz/aspi.rviz` | développeur ROS | contrats ci-dessous | `colcon build` OK | FINI |
+| J1-06 | État de l'art (`docs/ETAT_DE_L_ART.md`) | rédacteur technique | — | 6 approches, sources réelles | FINI |
+| J1-07 | Tests pytest de `planning.py` et `random_logic.py` | ingénieur test | J1-04 | `pytest` vert | FINI |
+| J1-08 | `launch/aspi_random.launch.py` | chef de projet | J1-03, J1-05 | Lance Gazebo + map_server + TF + nœuds + RViz | FINI |
+| J1-09 | Revue de J1-04/05/07/08 | relecteur | J1-04..08 | Aucun BLOQUANT | FINI |
+| J1-10 | Premier run A (seed 1), premier CSV | ingénieur test | J1-09 | CSV dans `results/` | FINI |
+| J1-11 | `scripts/plot_results.py`, première courbe | analyste résultats | J1-10 | `results/coverage_vs_time.png` | FINI |
+| J1-12 | Journal du jour 1 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
+
+| J1-13 | Mode headless + accéléré, validation par critères (seed 1 temps réel vs accéléré) | chef de projet + ingénieur test | J1-10 | 5 critères OK | FINI |
+| J1-14 | Runs A seeds 2 et 3 (accéléré) | ingénieur test | J1-13 | CSV + courbe 3 runs | FINI |
 
 ## Contrats d'interface (fixés par l'architecte)
 
