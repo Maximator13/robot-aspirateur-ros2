@@ -115,3 +115,39 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - Simulation environ 1.4 fois plus lente que le temps réel. Sans conséquence, car tout est en temps simulé.
   - Fichiers : `results/coverage_vs_time.png`, `results/summary.md`, rosbag de 24 Mo.
   - Limite : un seul run, donc aucune conclusion statistique pour l'instant.
+
+### 2026-10-08 · Décision : simulation accélérée pour le protocole de la stratégie A
+
+- **Contexte** : un run de 600 s simulées prenait environ 14 min murales (simulation à environ 0.7 × le temps réel sous WSL, fenêtres ouvertes). Le protocole demande plusieurs runs.
+- **Options envisagées** : rester en temps réel avec fenêtres ; mode headless seul ; headless avec monde accéléré.
+- **Choix** : launch avec deux arguments.
+  - `headless:=true` : ni gzclient ni RViz.
+  - `fast:=true` : copie du monde `turtlebot3_world` dans `aspi_bot/worlds/`, avec `real_time_update_rate = 0`. gzserver tourne en lockstep, pour que la physique attende la mise à jour des capteurs.
+  - Spawn rendu robuste : timeout de 120 s au lieu de 30 s.
+- **Justification** : méthode de validation avec des critères fixés avant le run. Même seed (1) en accéléré et run de référence en temps réel. Une courbe identique n'est pas attendue : une marche aléatoire diverge à la moindre différence de timing. On juge donc la fidélité du contrôle en temps simulé.
+  - C1 : fréquence de `/scan` à 5 Hz ± 10 %.
+  - C2 : fréquence de `/cmd_vel` à 10 Hz ± 10 %.
+  - C3 : vitesse moyenne ± 15 %.
+  - C4 : near_collisions du même ordre (rapport < 2).
+  - C5 : % final ± 15 points.
+- **Résultat-leçon** :
+  - Résultats : C1 5.00 Hz OK ; C2 9.99 Hz OK ; C3 0.120 contre 0.12 m/s OK ; C4 24 contre 27 OK ; C5 54.4 % contre 58.1 % (écart de 3.7 points) OK.
+  - Les deux courbes sont quasi superposées jusqu'à environ 5 min (écart inférieur à 1 point à 60, 180 et 300 s), puis divergent (30.1 contre 36.5 % à 450 s).
+  - Facteur d'accélération de ×2.84 : 600 s simulées en environ 3.5 min murales, contre environ 14 min.
+  - Décision : tous les runs officiels de la stratégie A sont en mode accéléré (le seed 1 officiel est le run accéléré). Le run temps réel est conservé dans `results/comparaison_vitesse/` comme référence de validation.
+  - Vérifié en revue : `/clock` est publié à 10 Hz en temps simulé (pas de 0.1 s simulée, quelle que soit l'accélération), donc la granularité des timers ne change pas. Le lockstep ne synchronise pas les nœuds ROS : les fréquences sont donc vérifiées en temps simulé.
+  - La graine du launch est aussi transmise à Gazebo (`gzserver.launch.py` déclare un argument `seed`). Choix assumé, pour une meilleure reproductibilité.
+  - Limites : le facteur d'accélération dépend de la charge de la machine, à noter pour chaque run. Ne pas appliquer ce mode à Nav2 (stratégie B) sans une vérification croisée identique : la boucle de contrôle de Nav2 est probablement cadencée en temps mural. Elle serait alors ralentie en temps simulé, ce qui pénaliserait B.
+  - Leçon : valider un changement de banc de test par des critères chiffrés fixés à l'avance.
+
+### 2026-10-08 · Incidents mineurs : /clock et boucle d'attente
+
+- **Contexte** : deux incidents pendant la mise au point du mode accéléré.
+  - (a) Un abonné à `/clock` en QoS par défaut ne recevait aucun message.
+  - (b) Une boucle d'attente laissée en arrière-plan par un run précédent a dû être arrêtée.
+- **Options envisagées** : non applicable (incidents d'exécution).
+- **Choix** :
+  - (a) `/clock` est publié en BEST_EFFORT. L'abonnement utilise donc `qos_profile_sensor_data`.
+  - (b) Aucune boucle d'attente ne doit rester en arrière-plan après un run.
+- **Justification** : (a) une QoS incompatible entre éditeur et abonné empêche toute réception, sans message d'erreur explicite. (b) une boucle restante consomme des ressources et peut perturber le run suivant.
+- **Résultat-leçon** : vérifier la QoS de chaque topic avant de s'abonner. Ne jamais laisser de boucle d'attente derrière soi.
