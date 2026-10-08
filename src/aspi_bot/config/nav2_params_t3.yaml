@@ -1,0 +1,339 @@
+# Fichier d'essai de réglage (conservé pour traçabilité) — la config officielle est nav2_params.yaml
+# aspi T3 : copie de T2 avec contrôleur Regulated Pure Pursuit à la place de DWB (voir controller_server/FollowPath).
+# aspi T2 : copie de nav2_params.yaml (T1) + inflation des costmaps adaptée au balayage (voir "# aspi T2" dans le fichier).
+# aspi : configuration Nav2 de la stratégie B.
+# Source : /opt/ros/humble/share/turtlebot3_navigation2/param/humble/burger.yaml (version Humble).
+# Écarts par rapport à l'original (chacun marqué "# aspi :" à l'endroit modifié) :
+#   1. use_sim_time: True partout (simulation Gazebo).
+#   2. controller_server / general_goal_checker : xy_goal_tolerance 0.25 -> 0.15 m.
+# Vérifiés sans changement : amcl.robot_model_type = nav2_amcl::DifferentialMotionModel,
+#   waypoint_follower.stop_on_failure = false.
+amcl:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    base_frame_id: "base_footprint"
+    beam_skip_distance: 0.5
+    beam_skip_error_threshold: 0.9
+    beam_skip_threshold: 0.3
+    do_beamskip: false
+    global_frame_id: "map"
+    lambda_short: 0.1
+    laser_likelihood_max_dist: 2.0
+    laser_max_range: 100.0
+    laser_min_range: -1.0
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    max_particles: 2000
+    min_particles: 500
+    odom_frame_id: "odom"
+    pf_err: 0.05
+    pf_z: 0.99
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    resample_interval: 1
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    save_pose_rate: 0.5
+    sigma_hit: 0.2
+    tf_broadcast: true
+    transform_tolerance: 1.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    z_hit: 0.5
+    z_max: 0.05
+    z_rand: 0.5
+    z_short: 0.05
+    scan_topic: scan
+
+amcl_map_client:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+amcl_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+    global_frame: map
+    robot_base_frame: base_link
+    odom_topic: /odom
+    default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    enable_groot_monitoring: True
+    groot_zmq_publisher_port: 1666
+    groot_zmq_server_port: 1667
+    plugin_lib_names:
+    - nav2_compute_path_to_pose_action_bt_node
+    - nav2_compute_path_through_poses_action_bt_node
+    - nav2_follow_path_action_bt_node
+    - nav2_back_up_action_bt_node
+    - nav2_spin_action_bt_node
+    - nav2_wait_action_bt_node
+    - nav2_clear_costmap_service_bt_node
+    - nav2_is_stuck_condition_bt_node
+    - nav2_goal_reached_condition_bt_node
+    - nav2_goal_updated_condition_bt_node
+    - nav2_initial_pose_received_condition_bt_node
+    - nav2_reinitialize_global_localization_service_bt_node
+    - nav2_rate_controller_bt_node
+    - nav2_distance_controller_bt_node
+    - nav2_speed_controller_bt_node
+    - nav2_truncate_path_action_bt_node
+    - nav2_goal_updater_node_bt_node
+    - nav2_recovery_node_bt_node
+    - nav2_pipeline_sequence_bt_node
+    - nav2_round_robin_node_bt_node
+    - nav2_transform_available_condition_bt_node
+    - nav2_time_expired_condition_bt_node
+    - nav2_distance_traveled_condition_bt_node
+    - nav2_single_trigger_bt_node
+    - nav2_is_battery_low_condition_bt_node
+    - nav2_navigate_through_poses_action_bt_node
+    - nav2_navigate_to_pose_action_bt_node
+    - nav2_remove_passed_goals_action_bt_node
+    - nav2_planner_selector_bt_node
+    - nav2_controller_selector_bt_node
+    - nav2_goal_checker_selector_bt_node
+
+bt_navigator_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+controller_server:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+    controller_frequency: 10.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    # Progress checker parameters
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      movement_time_allowance: 10.0
+
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.15  # aspi : 0.25 -> 0.15 (espacement de balayage : 0.18 m demandé, 0.20 m effectif après arrondi à la grille de 0.05 m : 0.25 couperait les extrémités des lignes)
+      yaw_goal_tolerance: 0.25
+
+    # aspi T3 : DWB remplacé par Regulated Pure Pursuit. Les paramètres DWB (critics, scales, samples, acc_lim, etc.) sont retirés car sans objet pour ce plugin.
+    FollowPath:
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 0.15  # aspi T3 : même vitesse d'avance que le random_walker (comparaison A/B équitable)
+      lookahead_dist: 0.3  # aspi T3 : distance de visée fixe
+      min_lookahead_dist: 0.2  # aspi T3 : borne basse (inactive car visée non pilotée par la vitesse)
+      max_lookahead_dist: 0.6  # aspi T3 : borne haute (idem)
+      use_velocity_scaled_lookahead_dist: false  # aspi T3 : visée fixe, plus prévisible à vitesse constante
+      lookahead_time: 1.5  # défaut Humble, inactif tant que use_velocity_scaled_lookahead_dist est false
+      transform_tolerance: 0.1  # aspi T3
+      use_interpolation: true  # aspi T3
+      use_rotate_to_heading: true  # aspi T3 : rotation sur place vers le cap du chemin, comme le random_walker
+      rotate_to_heading_angular_vel: 1.0  # aspi T3 : = turn_speed du random_walker
+      rotate_to_heading_min_angle: 0.785  # aspi T3 : 45 degrés
+      max_angular_accel: 3.2  # aspi T3 : comme acc_lim_theta de T2
+      allow_reversing: false  # aspi T3 : incompatible avec use_rotate_to_heading (Humble)
+      use_collision_detection: true  # aspi T3
+      max_allowed_time_to_collision_up_to_carrot: 1.0  # aspi T3
+      use_regulated_linear_velocity_scaling: false  # aspi T3 : le planner de couverture garantit déjà la marge (érosion) ; ralentir dans les courbes serrées n'apporte rien à vitesse déjà basse
+      use_cost_regulated_linear_velocity_scaling: false  # aspi T3 : ralentir près des murs pénaliserait le balayage (lignes le long des obstacles)
+
+controller_server_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_link
+      use_sim_time: True  # aspi : simulation
+      rolling_window: true
+      width: 3
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.1
+      plugins: ["obstacle_layer", "voxel_layer", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 0.30  # aspi T2 : 1.0 -> 0.30. le planner de couverture garantit déjà une marge de 0.155 m (érosion) ; une inflation large pousse le plan global vers l'intérieur et fait hésiter DWB près des obstacles
+        cost_scaling_factor: 10.0  # aspi T2 : 3.0 -> 10.0. le planner de couverture garantit déjà une marge de 0.155 m (érosion) ; une inflation large pousse le plan global vers l'intérieur et fait hésiter DWB près des obstacles
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        map_subscribe_transient_local: True
+      always_send_full_costmap: True
+  local_costmap_client:
+    ros__parameters:
+      use_sim_time: True  # aspi : simulation
+  local_costmap_rclcpp_node:
+    ros__parameters:
+      use_sim_time: True  # aspi : simulation
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: True
+      robot_radius: 0.1
+      resolution: 0.05
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "voxel_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 10.0  # aspi T2 : 3.0 -> 10.0. le planner de couverture garantit déjà une marge de 0.155 m (érosion) ; une inflation large pousse le plan global vers l'intérieur et fait hésiter DWB près des obstacles
+        inflation_radius: 0.30  # aspi T2 : 0.55 -> 0.30. le planner de couverture garantit déjà une marge de 0.155 m (érosion) ; une inflation large pousse le plan global vers l'intérieur et fait hésiter DWB près des obstacles
+      always_send_full_costmap: True
+  global_costmap_client:
+    ros__parameters:
+      use_sim_time: True  # aspi : simulation
+  global_costmap_rclcpp_node:
+    ros__parameters:
+      use_sim_time: True  # aspi : simulation
+
+map_server:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+    yaml_filename: "map.yaml"
+
+map_saver:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 20.0
+    use_sim_time: True  # aspi : simulation
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+planner_server_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+# aspi : section ignorée en Humble (le serveur s'appelle behavior_server), valeurs par défaut appliquées ; conservée telle que la source
+recoveries_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    recovery_plugins: ["spin", "backup", "wait"]
+    spin:
+      plugin: "nav2_recoveries/Spin"
+    backup:
+      plugin: "nav2_recoveries/BackUp"
+    wait:
+      plugin: "nav2_recoveries/Wait"
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_timeout: 0.1
+    use_sim_time: True  # aspi : simulation
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+robot_state_publisher:
+  ros__parameters:
+    use_sim_time: True  # aspi : simulation
+
+waypoint_follower:
+  ros__parameters:
+    loop_rate: 20  # aspi : 2000 dans la source TurtleBot3 (boucle à 2 kHz qui sature le CPU) ; 20 = valeur par défaut de Nav2
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200

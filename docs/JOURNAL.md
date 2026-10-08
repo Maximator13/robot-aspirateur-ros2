@@ -201,3 +201,46 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - (c) argument renommé `nav2_params`.
 - **Justification** : (c) les arguments de launch ne sont pas cloisonnés entre nœuds inclus en ROS 2 Humble.
 - **Résultat-leçon** : les arguments de launch sont partagés entre les nœuds inclus : leur donner des noms spécifiques. Un conteneur Nav2 peut survivre à l'arrêt normal : vérifier son PID après chaque run.
+
+### 2026-10-08 · Stratégie B : réglages T1 et T2 (surcharge CPU et inflation)
+
+- **Contexte** : essais de 300 s en temps réel sur la stratégie B. Pourcentage couvert à 180 s / 300 s : T0 17.4 / 19.5 ; T1 17.5 / 18.2 ; T2 21.9 / 21.9.
+- **Options envisagées** : un facteur à la fois, chacun mesuré séparément. T1 : `loop_rate` à 20. T2 : T1 plus inflation à 0.30 m et `cost_scaling` à 10 dans les deux costmaps.
+- **Choix** : T1 et T2 testés successivement, sans les cumuler sans mesure.
+- **Justification** : T1 supprime la surcharge CPU (« Processing waypoint » : 18 741 → 215 lignes ; contrôleur à 10.15 Hz en temps simulé, facteur temps réel 0.90) mais ne change pas le comportement. T2 accélère le début (+4 points à 180 s) mais le robot reste bloqué de 177 s à la fin.
+- **Résultat-leçon** : cause localisée du blocage : une ligne de balayage coupée par un pilier (waypoints (3.52, -0.67) puis (2.77, -0.67) ; pilier en x 2.96–3.27, y -0.72 à -0.42). Le robot finit le premier segment face au pilier à 0.25 m. DWB oscille (vx ≈ 0, wz ±0.03 à 0.18 rad/s) sans contourner. La surcharge CPU était un vrai défaut, mais pas la cause du blocage. Mesurer chaque correction séparément évite de conclure trop vite.
+
+### 2026-10-08 · Stratégie B : contrôleur Regulated Pure Pursuit (T3)
+
+- **Contexte** : le contrôleur DWB reste bloqué au pilier (entrée précédente). Essai d'un autre contrôleur de Nav2, Regulated Pure Pursuit (RPP).
+- **Options envisagées** :
+  - changer de contrôleur ;
+  - calculer les contournements dans notre planner (T4) ;
+  - décomposition cellulaire de Choset (trop long pour 3 jours).
+- **Choix** : changer de contrôleur (T3). Réglages alignés sur la stratégie A pour une comparaison équitable : vitesse de 0.15 m/s (celle de `random_walker` ; DWB autorisait 0.22 m/s), rotation sur place à 1.0 rad/s (celle de `random_walker`), pas de ralentissement près des obstacles.
+- **Justification** : le blocage venait du comportement de DWB face au pilier, pas du réglage de l'inflation. RPP n'a pas été comparé à d'autres contrôleurs.
+- **Résultat-leçon** : à 300 s, T3 atteint 28.5 % de couverture (T2 : 21.9 %), 30.5 m parcourus, 1 near_collision (T2 : 5), 0 « Failed to make progress » (T2 : 13), 0 recovery. Dernier waypoint atteint : 37/112 (T2 : 19). Le passage du pilier prend environ 13 s : rotation sur place puis contournement par le sud. Limites restantes : la vitesse (0.15 m/s) et les rotations sur place (environ 48 s sur 300 s).
+
+### 2026-10-08 · Stratégie B : contournements calculés par le planner (T4, impasse)
+
+- **Contexte** : après T3, les lignes de balayage restent coupées par les obstacles. Essai de contournements calculés par notre planner.
+- **Options envisagées** : garder T3 seul ; ajouter des points de contournement calculés par le planner (T4).
+- **Choix** : T3 retenu. `plan_transitions` est conservé, testé, et désactivé par défaut (argument de launch).
+- **Justification** : principe de `plan_transitions` : fonction pure, Dijkstra sur le 8-voisinage du masque atteignable, simplification par visibilité, tronçons ≤ 0.3 m. Résultat : 112 → 245 waypoints, 49 transitions corrigées, 0 point hors masque, 8 tests unitaires (39 tests au total). Bug trouvé pendant le développement : des tronçons à 45° passaient exactement sur un coin de cellule, et l'arrondi les rangeait hors masque. Correction par un test exact de segment. Résultat T4 (T3 plus contournements) à 300 s : 22.3 % contre 28.5 % pour T3 ; 25 à 26 waypoints d'origine atteints contre 36 ; 43 « collision ahead » (RPP), 8 « patience exceeded », 3 recoveries. Les points intermédiaires consomment 38 % du temps, car chaque but déclenche une replanification et une rotation.
+- **Résultat-leçon** : avec RPP, Nav2 contourne déjà les obstacles. Notre marge (0.155 m) est aussi plus faible que ce que la costmap Nav2 accepte, d'où les conflits. Une amélioration algorithmique « évidente » doit être mesurée : elle peut être contre-productive selon le reste de la chaîne.
+
+### 2026-10-08 · Bug : fuite mémoire de coverage_executor
+
+- **Contexte** : un executor orphelin occupait 4.8 Go de RAM (80 %) et survivait à SIGINT.
+- **Options envisagées** : non consignées.
+- **Choix** : boucle `spin_once` avec test du future. Sortie si rclpy n'est plus ok ou si le serveur d'action disparaît. Annulation avec délai. Paramètre `max_duration`, réglé par le launch à `run_duration` + 10 s.
+- **Justification** : cause, par lecture du code de rclpy et de `nav2_simple_commander` (Humble) : le gestionnaire de signal de rclpy éteint le contexte sans lever `KeyboardInterrupt`. La boucle `while not isTaskComplete()` ne testait pas `rclpy.ok()` et tournait à vide. Chaque appel à `spin_until_future_complete` ajoutait un callback au même future, jamais résolu.
+- **Résultat-leçon** : vérifié pendant T4, mémoire stable (74.7 → 74.9 Mo en 4 min). Une boucle d'attente doit toujours tester l'état du contexte ROS et avoir une sortie explicite.
+
+### 2026-10-08 · Écart de 245 / 247 waypoints entre le nœud et le calcul hors ligne
+
+- **Contexte** : le nœud produit 245 waypoints, le calcul hors ligne 247 pour la même carte.
+- **Options envisagées** : non applicable (explication d'un écart constaté).
+- **Choix** : aucune correction ; les deux résultats sont valides (0 transition non résolue, 0 tronçon hors masque).
+- **Justification** : la résolution de `nav_msgs/OccupancyGrid` est un float32 (0.05 devient 0.05000000074…). Cet arrondi minime déplace quelques points de simplification situés exactement sur des frontières de cellules.
+- **Résultat-leçon** : connaître les types des messages ROS (float32) quand on compare un calcul hors ligne et un calcul en ligne.

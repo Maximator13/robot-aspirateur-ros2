@@ -35,6 +35,9 @@ class CoveragePlanner(Node):
         self.sweep_spacing = self.declare_parameter('sweep_spacing', 0.18).value
         self.start_x = self.declare_parameter('start_x', 0.0).value
         self.start_y = self.declare_parameter('start_y', 0.0).value
+        # Défaut False : les contournements de transitions n'ont pas amélioré le balayage (essai T4 négatif, voir docs/JOURNAL.md)
+        self.plan_transitions = self.declare_parameter('plan_transitions', False).value
+        self.transition_step = self.declare_parameter('transition_step', 0.3).value
 
         self.path_pub = self.create_publisher(Path, '/coverage_path', LATCHED_QOS)
         self.create_subscription(OccupancyGrid, '/map', self.on_map, LATCHED_QOS)
@@ -59,6 +62,16 @@ class CoveragePlanner(Node):
         waypoints = planning.boustrophedon_waypoints(
             reachable, info.origin.position.x, info.origin.position.y,
             info.resolution, self.sweep_spacing)
+        if self.plan_transitions:
+            n_before = len(waypoints)
+            waypoints, n_unresolved = planning.plan_transitions(
+                reachable, waypoints, info.origin.position.x, info.origin.position.y,
+                info.resolution, self.transition_step)
+            self.get_logger().info(
+                f'contournements : {n_before} waypoints avant, {len(waypoints)} après')
+            if n_unresolved > 0:
+                self.get_logger().warn(
+                    f'{n_unresolved} transition(s) non résolue(s) : gardées en ligne droite')
         self.path_pub.publish(self.make_path(waypoints))
         # Même formule que planning.boustrophedon_waypoints
         eff_spacing = max(1, int(round(self.sweep_spacing / info.resolution))) * info.resolution

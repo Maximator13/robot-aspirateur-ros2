@@ -15,8 +15,11 @@ Principe et complexité (N = nb de cellules, K = nb de cellules du disque d'éro
 - érosion par un disque : ET logique de K décalages de la grille, O(N.K).
 - composante connexe : parcours en largeur (BFS) 4-voisinage, O(N).
 - boustrophédon : une ligne sur `spacing`, découpée en segments contigus, O(N).
+- transitions : test de ligne de vue exact O(L / résolution) par paire de waypoints ;
+  si bloquée, Dijkstra 8-voisinage O(N log N) puis lissage par ligne de vue.
 """
 
+import heapq
 import math
 from collections import deque
 
@@ -272,3 +275,203 @@ def boustrophedon_waypoints(reachable, origin_x, origin_y, resolution, sweep_spa
                                            origin_x, origin_y, resolution)
         left_to_right = not left_to_right
     return waypoints
+
+
+# ---------------------------------------------------------------------------
+# Transitions entre waypoints (contournement des obstacles)
+# ---------------------------------------------------------------------------
+#
+# Problème : boustrophedon_waypoints enchaîne parfois deux waypoints séparés par
+# un obstacle (deux segments d'une même ligne de part et d'autre d'un pilier).
+# Nav2 reçoit alors un but « derrière le pilier » et le contrôleur peut se bloquer.
+# Solution : si la ligne droite entre deux waypoints sort du masque atteignable,
+# on insère des points intermédiaires qui contournent l'obstacle.
+
+def line_of_sight(reachable, p0, p1, origin_x, origin_y, resolution):
+    """True si le segment monde p0 -> p1 ne traverse que des cellules de `reachable`.
+
+    Test exact : on coupe le segment à chaque fois qu'il franchit une ligne de la
+    grille (x = origin_x + k.res ou y = origin_y + k.res). Chaque morceau est alors
+    entièrement dans une seule cellule : il suffit de tester son milieu.
+    (Un simple échantillonnage n'est pas fiable : un segment qui passe pile par
+    un coin de cellule donnait des résultats différents selon le pas choisi.)
+    """
+    (x0, y0), (x1, y1) = p0[:2], p1[:2]
+    cuts = {0.0, 1.0}
+    cuts |= _grid_crossings(x0, x1, origin_x, resolution)
+    cuts |= _grid_crossings(y0, y1, origin_y, resolution)
+    cuts = sorted(cuts)
+    if x0 == x1 and y0 == y1:
+        cuts = [0.0, 0.0]  # segment réduit à un point : on teste ce point
+    for t_a, t_b in zip(cuts[:-1], cuts[1:]):
+        t = 0.5 * (t_a + t_b)
+        row, col = world_to_cell(x0 + t * (x1 - x0), y0 + t * (y1 - y0),
+                                 origin_x, origin_y, resolution)
+        if not (in_bounds(reachable, row, col) and reachable[row, col]):
+            return False
+    return True
+
+
+def _grid_crossings(v0, v1, origin, resolution):
+    """Paramètres t de ]0, 1[ où la coordonnée v0 + t.(v1 - v0) franchit une ligne de grille."""
+    if v0 == v1:
+        return set()
+    lo, hi = sorted((v0, v1))
+    k_first = int(math.floor((lo - origin) / resolution)) + 1
+    k_last = int(math.ceil((hi - origin) / resolution)) - 1
+    crossings = set()
+    for k in range(k_first, k_last + 1):
+        t = (origin + k * resolution - v0) / (v1 - v0)
+        if 0.0 < t < 1.0:
+            crossings.add(t)
+    return crossings
+
+
+def shortest_path_cells(reachable, start, goal):
+    """Plus court chemin (liste de (row, col)) de start à goal dans `reachable`.
+
+    Dijkstra en 8-voisinage : coût 1 en ligne droite, sqrt(2) en diagonale.
+    Une diagonale n'est permise que si les deux cellules qu'elle longe sont
+    atteignables (pas de « coin coupé » contre un obstacle).
+    Renvoie None si goal n'est pas joignable depuis start.
+    """
+    dist = {start: 0.0}
+    parent = {start: None}
+    heap = [(0.0, start)]
+    while heap:
+        d, cell = heapq.heappop(heap)
+        if cell == goal:
+            break
+        if d > dist[cell]:
+            continue  # entrée périmée de la file de priorité
+        for nxt, cost in _neighbors8(reachable, cell):
+            nd = d + cost
+            if nd < dist.get(nxt, math.inf):
+                dist[nxt] = nd
+                parent[nxt] = cell
+                heapq.heappush(heap, (nd, nxt))
+    if goal not in parent:
+        return None
+    path = []
+    cell = goal
+    while cell is not None:  # remontée des parents de goal vers start
+        path.append(cell)
+        cell = parent[cell]
+    return path[::-1]
+
+
+def _neighbors8(reachable, cell):
+    """Voisins atteignables de `cell` (8-voisinage, sans coin coupé) avec leur coût."""
+    row, col = cell
+    result = []
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            if dr == 0 and dc == 0:
+                continue
+            nr, nc = row + dr, col + dc
+            if not (in_bounds(reachable, nr, nc) and reachable[nr, nc]):
+                continue
+            if dr != 0 and dc != 0:
+                if not (reachable[row + dr, col] and reachable[row, col + dc]):
+                    continue  # la diagonale frôlerait un obstacle
+                result.append(((nr, nc), math.sqrt(2.0)))
+            else:
+                result.append(((nr, nc), 1.0))
+    return result
+
+
+def simplify_path(points, reachable, origin_x, origin_y, resolution):
+    """Lissage par ligne de vue d'une liste de points monde (x, y).
+
+    On part du premier point ; on avance tant que la ligne droite depuis le
+    dernier point gardé reste dans le masque ; dès qu'elle en sort, on garde
+    le point précédent. Le premier et le dernier point sont toujours gardés.
+    """
+    if len(points) <= 2:
+        return list(points)
+    kept = [points[0]]
+    for i in range(2, len(points)):
+        if not line_of_sight(reachable, kept[-1], points[i], origin_x, origin_y, resolution):
+            kept.append(points[i - 1])
+    kept.append(points[-1])
+    return kept
+
+
+def split_long_legs(points, max_step):
+    """Découpe chaque tronçon plus long que max_step en parts égales (points (x, y))."""
+    if len(points) < 2:
+        return list(points)
+    result = [points[0]]
+    for (x0, y0), (x1, y1) in zip(points[:-1], points[1:]):
+        n = max(1, int(math.ceil(math.hypot(x1 - x0, y1 - y0) / max_step)))
+        for k in range(1, n + 1):
+            result.append((x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n))
+    return result
+
+
+def _cell_in_mask(reachable, x, y, origin_x, origin_y, resolution):
+    """Cellule de (x, y) si elle est atteignable, sinon la cellule atteignable la plus proche."""
+    row, col = world_to_cell(x, y, origin_x, origin_y, resolution)
+    if in_bounds(reachable, row, col) and reachable[row, col]:
+        return row, col
+    return nearest_true_cell(reachable, row, col)
+
+
+def detour_points(reachable, wp_a, wp_b, origin_x, origin_y, resolution, max_step):
+    """Points intermédiaires (x, y) pour aller de wp_a à wp_b en restant dans le masque.
+
+    Renvoie la liste des points STRICTEMENT entre wp_a et wp_b (vide si la ligne
+    droite suffit), ou None si les deux waypoints ne sont pas reliés dans le masque.
+    """
+    if line_of_sight(reachable, wp_a, wp_b, origin_x, origin_y, resolution):
+        return []
+    start = _cell_in_mask(reachable, wp_a[0], wp_a[1], origin_x, origin_y, resolution)
+    goal = _cell_in_mask(reachable, wp_b[0], wp_b[1], origin_x, origin_y, resolution)
+    if start is None or goal is None:
+        return None
+    cells = shortest_path_cells(reachable, start, goal)
+    if cells is None:
+        return None
+    # Centres de cellules, encadrés par les positions exactes des deux waypoints.
+    points = [tuple(wp_a[:2])]
+    points += [cell_to_world(r, c, origin_x, origin_y, resolution) for r, c in cells]
+    points.append(tuple(wp_b[:2]))
+    points = simplify_path(points, reachable, origin_x, origin_y, resolution)
+    points = split_long_legs(points, max_step)
+    return points[1:-1]
+
+
+def plan_transitions(reachable, waypoints, origin_x, origin_y, resolution, max_step=0.3):
+    """Insère des points de contournement entre waypoints séparés par un obstacle.
+
+    - Paire dont la ligne droite reste dans `reachable` : gardée telle quelle.
+    - Sinon : plus court chemin dans le masque, lissé, découpé en tronçons
+      <= max_step ; les points insérés sont orientés vers le point suivant.
+    - Les waypoints d'origine sont tous conservés, avec leur yaw.
+
+    Renvoie (nouveaux_waypoints, n_non_resolues) : n_non_resolues compte les paires
+    qu'on n'a pas pu relier dans le masque (gardées en ligne droite ; ne devrait
+    pas arriver puisque le masque est une seule composante connexe).
+    Liste vide ou 1 waypoint : renvoyée telle quelle.
+    """
+    if len(waypoints) < 2:
+        return list(waypoints), 0
+    result = [waypoints[0]]
+    n_unresolved = 0
+    for wp_a, wp_b in zip(waypoints[:-1], waypoints[1:]):
+        extra = detour_points(reachable, wp_a, wp_b, origin_x, origin_y, resolution, max_step)
+        if extra is None:
+            n_unresolved += 1
+            extra = []
+        result += _orient_towards_next(extra, wp_b)
+        result.append(wp_b)
+    return result, n_unresolved
+
+
+def _orient_towards_next(points, next_wp):
+    """Ajoute à chaque point (x, y) un yaw dirigé vers le point suivant de la liste."""
+    oriented = []
+    targets = list(points[1:]) + [next_wp[:2]]
+    for (x, y), (tx, ty) in zip(points, targets):
+        oriented.append((x, y, math.atan2(ty - y, tx - x)))
+    return oriented

@@ -46,6 +46,14 @@ def make_initial_pose(nav):
     return pose
 
 
+def cancel_task(nav, timeout=5.0):
+    """Annule le but Nav2 avec un délai max (cancelTask() attend sans limite)."""
+    if nav.result_future is None or nav.goal_handle is None:
+        return
+    future = nav.goal_handle.cancel_goal_async()
+    rclpy.spin_until_future_complete(nav, future, timeout_sec=timeout)
+
+
 def run(nav):
     log = nav.get_logger()
 
@@ -75,12 +83,34 @@ def run(nav):
         return
     log.info('Suivi du balayage démarré')
 
+    t_start = nav.get_clock().now()  # temps simulé (use_sim_time)
+    max_duration = nav.get_parameter('max_duration').value
     last_wp = -1
-    while not nav.isTaskComplete():
+    status_known = False
+    # On n'utilise PAS nav.isTaskComplete() : il appelle spin_until_future_complete
+    # sans jamais rendre la main si rclpy est arrêté (boucle chaude) et ajoute
+    # un callback au future à chaque appel (fuite mémoire). spin_once + done() suffit.
+    while rclpy.ok():
+        rclpy.spin_once(nav, timeout_sec=0.1)
+        if nav.result_future.done():
+            nav.status = nav.result_future.result().status
+            status_known = True
+            break
         feedback = nav.getFeedback()
         if feedback is not None and feedback.current_waypoint != last_wp:
             last_wp = feedback.current_waypoint
             log.info(f'Waypoint {last_wp + 1}/{len(poses)}')
+        if not nav.follow_waypoints_client.server_is_ready():
+            log.error('Serveur FollowWaypoints disparu : arrêt de l\'executor')
+            return
+        elapsed = (nav.get_clock().now() - t_start).nanoseconds / 1e9
+        if max_duration > 0.0 and elapsed >= max_duration:
+            log.info(f'max_duration atteinte ({elapsed:.0f} s) : annulation')
+            cancel_task(nav)
+            return
+    if not status_known:
+        log.warn('Arrêt de rclpy demandé : fin sans résultat')
+        return
 
     result = nav.getResult()
     if result == TaskResult.SUCCEEDED:
@@ -106,6 +136,8 @@ def main(args=None):
     nav.declare_parameter('initial_x', 0.0)
     nav.declare_parameter('initial_y', 0.0)
     nav.declare_parameter('initial_yaw', 0.0)
+    # 0.0 = illimité ; sinon durée (s simulées) après laquelle on annule et on quitte
+    nav.declare_parameter('max_duration', 0.0)
     try:
         run(nav)
     except (KeyboardInterrupt, ExternalShutdownException):
@@ -113,7 +145,7 @@ def main(args=None):
         # On n'annule la tâche Nav2 que s'il est encore utilisable.
         if rclpy.ok():
             try:
-                nav.cancelTask()
+                cancel_task(nav)
             except Exception as err:  # arrêt en cours : ne pas masquer la sortie
                 nav.get_logger().warn(f'cancelTask impossible : {err}')
         else:

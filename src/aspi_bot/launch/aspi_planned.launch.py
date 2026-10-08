@@ -17,7 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
@@ -32,6 +32,7 @@ def generate_launch_description():
     run_duration = LaunchConfiguration('run_duration')
     headless = LaunchConfiguration('headless')
     fast = LaunchConfiguration('fast')
+    plan_transitions = LaunchConfiguration('plan_transitions')
     spawn_x = LaunchConfiguration('spawn_x')
     spawn_y = LaunchConfiguration('spawn_y')
     sim = {'use_sim_time': True}
@@ -53,6 +54,11 @@ def generate_launch_description():
                               description='true : ni gzclient ni RViz'),
         DeclareLaunchArgument('fast', default_value='false',
                               description='true : simulation accélérée (à valider pour Nav2)'),
+        # Désactivé par défaut : essai T4 négatif (avec RPP, Nav2 contourne déjà les obstacles ;
+        # les waypoints intermédiaires multiplient les arrêts : 22.3 % contre 28.5 % à 300 s).
+        DeclareLaunchArgument('plan_transitions', default_value='false',
+                              description='true : contournements calculés dans le masque atteignable '
+                                          'entre deux segments séparés par un obstacle'),
         DeclareLaunchArgument('spawn_x', default_value='-2.0'),
         DeclareLaunchArgument('spawn_y', default_value='-0.5'),
     ]
@@ -74,11 +80,18 @@ def generate_launch_description():
     # Départ = origine de la carte (carte construite depuis le spawn)
     planner = Node(
         package='aspi_bot', executable='coverage_planner', name='coverage_planner',
-        output='screen', parameters=[sim, {'start_x': 0.0, 'start_y': 0.0}])
+        output='screen',
+        parameters=[sim, {'start_x': 0.0, 'start_y': 0.0,
+                          'plan_transitions': ParameterValue(plan_transitions, value_type=bool)}])
     executor = Node(
         package='aspi_bot', executable='coverage_executor', name='coverage_executor',
         output='screen',
-        parameters=[sim, {'initial_x': 0.0, 'initial_y': 0.0, 'initial_yaw': 0.0}])
+        parameters=[sim, {
+            'initial_x': 0.0, 'initial_y': 0.0, 'initial_yaw': 0.0,
+            # L'executor s'arrête seul (but annulé) 10 s après la fin de la mesure du tracker :
+            # il ne coupe jamais le robot avant la fin du run, et ne tourne pas indéfiniment après.
+            'max_duration': ParameterValue(
+                PythonExpression([run_duration, ' + 10.0']), value_type=float)}])
     tracker = Node(
         package='aspi_bot', executable='coverage_tracker', name='coverage_tracker',
         output='screen',
