@@ -30,15 +30,15 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 | J2-02 | `coverage_planner_node.py` (`/map` → `/coverage_path`) + displays Nav2 dans `rviz/aspi.rviz` | développeur ROS | — | build OK, trajet visible dans RViz | FINI |
 | J2-03 | `coverage_executor_node.py` (BasicNavigator, `followWaypoints`) + arrêt propre du `random_walker` | développeur ROS | — | build OK | FINI |
 | J2-04 | `launch/sim.launch.py` (Gazebo commun A/B), `aspi_random` l'inclut, `aspi_planned.launch.py` | chef de projet | J2-01..03 | Les deux launch démarrent | FINI |
-| J2-05 | `docs/ARCHITECTURE.md` + `docs/ALGORIGRAMMES.md` (A maintenant, B une fois le code écrit) | rédacteur technique | — | Mermaid fidèle au code | EN COURS |
+| J2-05 | `docs/ARCHITECTURE.md` + `docs/ALGORIGRAMMES.md` (A maintenant, B une fois le code écrit) | rédacteur technique | — | Mermaid fidèle au code | FINI |
 | J2-06 | Revue J2-01..04 | relecteur | J2-01..04 | Aucun BLOQUANT | FINI |
 | J2-07 | Nav2 seul : un goal manuel atteint (par script, temps réel) | ingénieur test | J2-06 | Goal atteint, AMCL localisé | FINI |
 | J2-08 | Run B complet en temps réel + non-régression de A (smoke test du launch refactorisé) | ingénieur test | J2-07 | CSV BOUSTROPHEDON | FINI |
 | J2-09 | Vérification croisée B temps réel vs accéléré (mêmes critères que A) | ingénieur test | J2-08 | Décision chiffrée | FINI (KO : B en temps réel) |
 | J2-11 | Essais de réglage B T0–T4 (300 s) : loop_rate, inflation, contrôleur RPP, contournements du planner | ingénieur test + développeur ROS + ingénieur algorithmes | J2-08 | Réglage retenu chiffré | FINI (T3 retenu, T4 négatif) |
 | J2-12 | Essai T5 : suppression du ralentissement d'approche (approach_velocity_scaling_dist 0.2) et de la pause aux waypoints | développeur ROS + ingénieur test | J2-09 | Gain mesuré | FINI (59.7 % vs 54.1 % à 600 s, T5 retenu) |
-| J2-13 | Protocole B (600 s, 3 runs, temps réel, config T5) + comparaison A/B | ingénieur test + analyste résultats | J2-09, J2-12 | Courbe A vs B | EN COURS |
-| J2-10 | Journal du jour 2 | opérateur / scribe | toutes | Entrées au format du brief | EN COURS |
+| J2-13 | Protocole B (600 s, 3 runs, temps réel, config T5) + comparaison A/B | ingénieur test + analyste résultats | J2-09, J2-12 | Courbe A vs B | FINI (A 51.0 ± 6.7 %, B 44.1 ± 23.4 % dont B3 bloqué) |
+| J2-10 | Journal du jour 2 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
 
 ### Contrats jour 2 (fixés par l'architecte)
 

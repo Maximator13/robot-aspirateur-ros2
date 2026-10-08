@@ -61,68 +61,100 @@ def make_initial_pose(nav):
 
 
 def cancel_task(nav, timeout=5.0):
-    """Annule le but Nav2 avec un délai max (cancelTask() attend sans limite)."""
+    """Annule le but Nav2 avec un délai max (cancelTask() attend sans limite).
+
+    N'échoue jamais : une erreur (ou un 2e Ctrl+C pendant l'arrêt) est loggée
+    pour ne pas masquer la sortie du programme.
+    """
     if nav.result_future is None or nav.goal_handle is None:
         return
-    future = nav.goal_handle.cancel_goal_async()
-    rclpy.spin_until_future_complete(nav, future, timeout_sec=timeout)
+    try:
+        future = nav.goal_handle.cancel_goal_async()
+        rclpy.spin_until_future_complete(nav, future, timeout_sec=timeout)
+    except (Exception, KeyboardInterrupt) as err:
+        nav.get_logger().warn(f'Annulation impossible : {err}')
 
 
-def wait_nav2_active(nav, nodes=('amcl', 'bt_navigator', 'waypoint_follower'),
-                     timeout=2.0):
-    """Attend que les nœuds Nav2 soient actifs, sans jamais bloquer sans limite.
+def wait_node_active(nav, name, timeout=2.0):
+    """Attend que le nœud lifecycle `name` soit actif (service GetState).
 
     Pourquoi pas nav.waitUntilNav2Active() ? Sa boucle appelle
     spin_until_future_complete(future) SANS timeout : si la réponse du service
-    get_state est perdue (DDS sous WSL), le processus reste dans rcl_wait (code C),
-    Python ne reprend jamais la main et Ctrl+C (SIGINT) est ignoré.
-    Ici chaque attente a un timeout : on retente, et rclpy.ok() est testé à chaque tour.
+    get_state est perdue (DDS sous WSL), elle attend indéfiniment sans jamais
+    renvoyer la requête (blocage observé 2 lancements sur 5, voir JOURNAL).
+    Ici chaque attente a un timeout : on renvoie la requête, et rclpy.ok() est
+    testé à chaque tour.
+    Retourne False si rclpy s'arrête avant que le nœud soit actif.
+    """
+    log = nav.get_logger()
+    client = nav.create_client(GetState, f'/{name}/get_state')
+    active = False
+    while rclpy.ok() and not active:
+        if not client.wait_for_service(timeout_sec=1.0):
+            log.info(f'/{name}/get_state indisponible, attente...',
+                     throttle_duration_sec=5.0)
+            continue
+        future = client.call_async(GetState.Request())
+        rclpy.spin_until_future_complete(nav, future, timeout_sec=timeout)
+        if future.result() is None:
+            future.cancel()  # réponse perdue : on oublie cette requête
+            log.warn(f'/{name}/get_state : pas de réponse, nouvel essai',
+                     throttle_duration_sec=5.0)
+            continue
+        label = future.result().current_state.label
+        active = label == 'active'
+        if not active:
+            log.info(f'{name} : état "{label}", attente...',
+                     throttle_duration_sec=5.0)
+            pause(nav, 1.0)  # pause réelle entre deux interrogations GetState
+    nav.destroy_client(client)
+    if not rclpy.ok():
+        return False
+    log.info(f'{name} actif')
+    return True
+
+
+def wait_initial_pose(nav):
+    """Republie la pose initiale jusqu'à la réception de /amcl_pose.
+
+    Même boucle que _waitForInitialPose de BasicNavigator (callback du navigator
+    qui positionne initial_pose_received). ~1 s entre deux publications :
+    chacune réinitialise le filtre d'AMCL.
+    """
+    log = nav.get_logger()
+    while rclpy.ok() and not nav.initial_pose_received:
+        # Même appel que _waitForInitialPose ; API privée de BasicNavigator,
+        # elle peut changer selon la version de nav2_simple_commander.
+        nav._setInitialPose()
+        log.info('Pose initiale publiée, attente de /amcl_pose...')
+        pause(nav, 1.0)
+
+
+def wait_action_server(nav):
+    """Attend le serveur d'action FollowWaypoints (boucle bornée, interruptible)."""
+    while rclpy.ok() and not nav.follow_waypoints_client.wait_for_server(
+            timeout_sec=1.0):
+        nav.get_logger().info('Serveur FollowWaypoints indisponible, attente...',
+                              throttle_duration_sec=5.0)
+
+
+def wait_nav2_active(nav):
+    """Séquence d'attente de Nav2 ; retourne False si l'arrêt est demandé.
 
     Le lifecycle_manager active les nœuds en séquence : waypoint_follower (dernier,
     il dépend de bt_navigator) doit être actif ET son serveur d'action visible
     avant d'envoyer FollowWaypoints, sinon le but est rejeté.
     """
-    log = nav.get_logger()
-    for name in nodes:
-        client = nav.create_client(GetState, f'/{name}/get_state')
-        active = False
-        while rclpy.ok() and not active:
-            if not client.wait_for_service(timeout_sec=1.0):
-                log.info(f'/{name}/get_state indisponible, attente...',
-                         throttle_duration_sec=5.0)
-                continue
-            future = client.call_async(GetState.Request())
-            rclpy.spin_until_future_complete(nav, future, timeout_sec=timeout)
-            if future.result() is None:
-                future.cancel()  # réponse perdue : on oublie cette requête
-                log.warn(f'/{name}/get_state : pas de réponse, nouvel essai',
-                         throttle_duration_sec=5.0)
-                continue
-            label = future.result().current_state.label
-            active = label == 'active'
-            if not active:
-                log.info(f'{name} : état "{label}", attente...',
-                         throttle_duration_sec=5.0)
-                pause(nav, 1.0)  # pause réelle entre deux interrogations GetState
-        nav.destroy_client(client)
-        if not rclpy.ok():
-            return False
-        log.info(f'{name} actif')
-        if name == 'amcl':
-            # Comme _waitForInitialPose de BasicNavigator : republier la pose
-            # initiale jusqu'à ce que /amcl_pose soit reçu (callback du navigator).
-            # ~1 s entre deux publications : chacune réinitialise le filtre d'AMCL.
-            while rclpy.ok() and not nav.initial_pose_received:
-                nav._setInitialPose()
-                log.info('Pose initiale publiée, attente de /amcl_pose...')
-                pause(nav, 1.0)
-    # Serveur d'action FollowWaypoints : boucle bornée par tour, interruptible.
-    while rclpy.ok() and not nav.follow_waypoints_client.wait_for_server(
-            timeout_sec=1.0):
-        log.info('Serveur FollowWaypoints indisponible, attente...',
-                 throttle_duration_sec=5.0)
+    if not wait_node_active(nav, 'amcl'):
+        return False
+    wait_initial_pose(nav)
+    if not wait_node_active(nav, 'bt_navigator'):
+        return False
+    if not wait_node_active(nav, 'waypoint_follower'):
+        return False
+    wait_action_server(nav)
     if rclpy.ok():
-        log.info('Nav2 actif')
+        nav.get_logger().info('Nav2 actif')
     return rclpy.ok()
 
 
@@ -145,7 +177,7 @@ def run(nav):
         pose.header.stamp = Time()
 
     # Ordre recommandé : pose initiale AVANT l'attente de Nav2
-    # (wait_nav2_active la republie jusqu'à recevoir /amcl_pose).
+    # (wait_initial_pose la republie jusqu'à recevoir /amcl_pose).
     nav.setInitialPose(make_initial_pose(nav))
     log.info('Attente de Nav2 (amcl + bt_navigator + waypoint_follower)...')
     if not wait_nav2_active(nav):
@@ -153,7 +185,9 @@ def run(nav):
         return
 
     # Limite connue (non corrigée) : followWaypoints() de BasicNavigator attend
-    # l'acceptation du but sans délai (robot_navigator.py:175).
+    # l'acceptation du but sans délai (robot_navigator.py:175). Conséquence : si
+    # la réponse à send_goal est perdue, l'appel bloque. Ctrl+C reste efficace
+    # car /clock réveille l'attente ~10 fois par seconde.
     # Nouvel essai en cas de rejet (serveur pas encore prêt) : 5 essais max.
     max_essais = 5
     for essai in range(1, max_essais + 1):
@@ -200,10 +234,7 @@ def run(nav):
             if now - lost_since >= 3.0:
                 log.error('Serveur FollowWaypoints disparu depuis 3 s : '
                           'annulation et arrêt de l\'executor')
-                try:
-                    cancel_task(nav, timeout=2.0)
-                except (Exception, KeyboardInterrupt) as err:
-                    log.warn(f'Annulation impossible : {err}')
+                cancel_task(nav, timeout=2.0)
                 return
         elapsed = (nav.get_clock().now() - t_start).nanoseconds / 1e9
         if max_duration > 0.0 and elapsed >= max_duration:
@@ -248,12 +279,10 @@ def main(args=None):
         run(nav)
     except (KeyboardInterrupt, ExternalShutdownException):
         # Arrêt demandé (SIGINT) : le contexte rclpy peut déjà être détruit.
-        # On n'annule la tâche Nav2 que s'il est encore utilisable.
+        # On n'annule la tâche Nav2 que s'il est encore utilisable
+        # (cancel_task gère elle-même un 2e Ctrl+C).
         if rclpy.ok():
-            try:
-                cancel_task(nav)
-            except (Exception, KeyboardInterrupt) as err:  # 2e Ctrl+C possible; arrêt en cours : ne pas masquer la sortie
-                nav.get_logger().warn(f'cancelTask impossible : {err}')
+            cancel_task(nav)
         else:
             nav.get_logger().info('Arrêt demandé : contexte ROS déjà fermé')
     finally:

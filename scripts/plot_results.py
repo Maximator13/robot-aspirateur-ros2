@@ -6,7 +6,7 @@ Usage :
 
 Entrée : DIR/<STRATEGIE>_<seed>_<AAAAMMJJ-HHMMSS>.csv
          colonnes : time, coverage_percent, distance, near_collisions
-Sortie : DIR/coverage_vs_time.png et DIR/summary.md
+Sortie : DIR/coverage_vs_time.png, DIR/coverage_vs_time_runs.png et DIR/summary.md
 """
 import argparse
 import csv
@@ -19,6 +19,7 @@ matplotlib.use('Agg')  # pas de fenêtre : on écrit seulement un PNG
 import matplotlib.pyplot as plt
 
 SEUIL = 80.0  # % de couverture visé
+T_INTERMEDIAIRE = 300.0  # s : instant de la colonne « % à 300 s »
 # Couleurs sobres, distinctes (y compris en niveaux de gris / daltonisme)
 COULEURS = {'RANDOM': '#d95f02', 'BOUSTROPHEDON': '#1b6ca8'}
 COULEUR_DEFAUT = '#555555'
@@ -77,11 +78,11 @@ def tracer(runs_par_strat, duration, sortie):
         c = COULEURS.get(strat, COULEUR_DEFAUT)
         courbes = np.array([courbe_sur_grille(r, grille) for r in runs])
         for y in courbes:
-            ax.plot(x, y, color=c, lw=0.8, alpha=0.5)
+            ax.plot(x, y, color=c, lw=1.2, alpha=0.9, ls='--')
         ax.fill_between(x, courbes.min(axis=0), courbes.max(axis=0),
                         color=c, alpha=0.2)
         ax.plot(x, courbes.mean(axis=0), color=c, lw=2.5,
-                label=f'{strat} (moyenne, {len(runs)} run{"s" if len(runs) > 1 else ""})')
+                label=f'{strat} (moyenne en trait épais, runs en pointillés, {len(runs)} run{"s" if len(runs) > 1 else ""})')
     ax.axhline(SEUIL, color='gray', ls='--', lw=1, label=f'{SEUIL:.0f} %')
     ax.set_xlabel('Temps simulé (min)')
     ax.set_ylabel('Surface couverte (%)')
@@ -95,6 +96,36 @@ def tracer(runs_par_strat, duration, sortie):
     plt.close(fig)
 
 
+def tracer_par_run(runs_par_strat, duration, sortie):
+    """Seconde figure : un sous-graphe par stratégie, chaque run étiqueté (seed)."""
+    n = len(runs_par_strat)
+    fig, axes = plt.subplots(1, n, figsize=(6 * n, 5), dpi=150, sharey=True,
+                             squeeze=False)
+    styles = ['-', '--', ':', '-.']
+    for ax, (strat, runs) in zip(axes[0], sorted(runs_par_strat.items())):
+        c = COULEURS.get(strat, COULEUR_DEFAUT)
+        for i, r in enumerate(runs):
+            ax.plot(r['t'] / 60.0, r['cov'], color=c, lw=1.8,
+                    ls=styles[i % len(styles)],
+                    label=f"seed {r['seed']} ({r['cov'][-1]:.1f} % final)")
+        ax.axhline(SEUIL, color='gray', ls='--', lw=1)
+        ax.set_title(strat)
+        ax.set_xlabel('Temps simulé (min)')
+        ax.set_xlim(0, duration / 60.0)
+        ax.set_ylim(0, 100)
+        ax.grid(alpha=0.3)
+        ax.legend(loc='upper left')
+    axes[0][0].set_ylabel('Surface couverte (%)')
+    fig.tight_layout()
+    fig.savefig(sortie)
+    plt.close(fig)
+
+
+def cov_a(run, t):
+    """Couverture à l'instant t (dernière valeur connue avant t)."""
+    return float(np.interp(t, run['t'], run['cov']))
+
+
 def fmt_temps(t):
     return 'non atteint' if t is None else f'{t:.0f} s'
 
@@ -102,7 +133,7 @@ def fmt_temps(t):
 def ligne_run(r):
     t80 = temps_pour_seuil(r)
     return (f"| {r['strategie']} | {r['seed']} | {r['t'][-1]:.0f} s | "
-            f"{r['cov'][-1]:.1f} % | {fmt_temps(t80)} | "
+            f"{r['cov'][-1]:.1f} % | {cov_a(r, T_INTERMEDIAIRE):.1f} % | {fmt_temps(t80)} | "
             f"{r['dist'][-1]:.1f} | {int(r['nc'][-1])} |")
 
 
@@ -118,15 +149,16 @@ def ligne_moyenne(strat, runs):
              if atteints else 'non atteint')
     return (f"| **{strat} moyenne** | n={len(runs)} | "
             f"{ms([r['t'][-1] for r in runs], '{:.0f}')} s | "
-            f"{ms([r['cov'][-1] for r in runs], '{:.1f}')} % | {txt80} | "
+            f"{ms([r['cov'][-1] for r in runs], '{:.1f}')} % | "
+            f"{ms([cov_a(r, T_INTERMEDIAIRE) for r in runs], '{:.1f}')} % | {txt80} | "
             f"{ms([r['dist'][-1] for r in runs], '{:.1f}')} | "
             f"{ms([r['nc'][-1] for r in runs], '{:.1f}')} |")
 
 
 def construire_tableau(runs_par_strat):
     """Tableau Markdown : une ligne par run, puis moyenne ± écart-type."""
-    out = ['| Stratégie | Seed | Durée | % final | Temps pour 80 % | Distance (m) | near_collisions |',
-           '|---|---|---|---|---|---|---|']
+    out = ['| Stratégie | Seed | Durée | % final | % à 300 s | Temps pour 80 % | Distance (m) | near_collisions |',
+           '|---|---|---|---|---|---|---|---|']
     for strat, runs in sorted(runs_par_strat.items()):
         out += [ligne_run(r) for r in runs]
         out.append(ligne_moyenne(strat, runs))
@@ -151,6 +183,8 @@ def main():
 
     png = args.results_dir / 'coverage_vs_time.png'
     tracer(runs_par_strat, args.duration, png)
+    png_runs = args.results_dir / 'coverage_vs_time_runs.png'
+    tracer_par_run(runs_par_strat, args.duration, png_runs)
     tableau = construire_tableau(runs_par_strat)
     (args.results_dir / 'summary.md').write_text(
         '# Résumé des runs\n\n' + tableau, encoding='utf-8')

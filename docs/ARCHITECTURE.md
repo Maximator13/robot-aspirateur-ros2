@@ -143,6 +143,8 @@ flowchart LR
     EX -- "/initialpose<br/>geometry_msgs/PoseWithCovarianceStamped" --> AMCL
     AMCL -- "/amcl_pose<br/>geometry_msgs/PoseWithCovarianceStamped" --> EX
     EX -- "action /follow_waypoints<br/>nav2_msgs/action/FollowWaypoints" --> NAV
+    EX -. "service /amcl/get_state<br/>lifecycle_msgs/srv/GetState" .-> AMCL
+    EX -. "services /bt_navigator/get_state<br/>et /waypoint_follower/get_state<br/>lifecycle_msgs/srv/GetState" .-> NAV
     GZ -- "/scan<br/>sensor_msgs/LaserScan" --> TR
     NAV -- "/cmd_vel<br/>geometry_msgs/Twist" --> GZ
     TR -- "/coverage_map<br/>nav_msgs/OccupancyGrid" --> RV
@@ -153,6 +155,7 @@ Rôles :
 
 - `coverage_planner` : une publication par carte reçue. Départ de calcul en (0, 0), l'origine de la carte (spawn). Logique dans `planning.py`.
 - `coverage_executor` : un `BasicNavigator` qui enchaîne pose initiale, attente de Nav2, `FollowWaypoints`, suivi. Il s'arrête de lui-même à `max_duration` (= `run_duration` + 10 s).
+- Attente de Nav2 (traits pointillés du schéma) : l'executor interroge les services `get_state` (`lifecycle_msgs/srv/GetState`) de `amcl`, `bt_navigator` et `waypoint_follower`, chacun avec un délai. Séquence : amcl actif, pose initiale republiée jusqu'à réception de `/amcl_pose`, bt_navigator actif, waypoint_follower actif, serveur d'action `FollowWaypoints` prêt, envoi des waypoints (jusqu'à 5 essais si le but est refusé). Détail dans `ALGORIGRAMMES.md`, section 3.2.
 - `coverage_tracker` : identique à A, seul `strategy` change.
 - `amcl` est dessiné à part du bloc Nav2 car l'executor dialogue directement avec lui (pose initiale, lecture de `/amcl_pose`).
 - `/scan` va aussi vers AMCL et les costmaps de Nav2 (non dessiné ici, voir 2.2).
@@ -189,7 +192,7 @@ Points à retenir :
 - Les costmaps locale et globale (couches obstacle, voxel, inflation) vivent dans `controller_server` et `planner_server`. Elles lisent `/scan` (non dessiné).
 - Le contrôleur est Regulated Pure Pursuit (essai T3, retenu). Le planner global est NavFn, non modifié.
 - `waypoint_follower.stop_on_failure` est à false : un waypoint en échec est sauté puis listé dans `missed_waypoints`.
-- L'algorigramme du `coverage_executor` est dans `ALGORIGRAMMES.md`, section 3 (la fonction d'attente de Nav2 y est signalée « à vérifier »).
+- L'algorigramme du `coverage_executor` est dans `ALGORIGRAMMES.md`, section 3.
 
 ### 2.3 Arbre TF
 
@@ -246,12 +249,14 @@ Base : `/opt/ros/humble/share/turtlebot3_navigation2/param/humble/burger.yaml`. 
 | 3 | `waypoint_follower.loop_rate` | 2000 | 20 | 2000 Hz saturait le CPU (37 000 lignes « Processing waypoint ») ; 20 est le défaut Nav2. Essai T1 |
 | 4 | inflation des deux costmaps | rayon 1.0 (locale) et 0.55 (globale), échelle 3.0 | rayon 0.30, échelle 10.0 | Le planner garantit déjà une marge de 0.155 m. Une large inflation repousse les lignes vers l'intérieur. Essai T2 |
 | 5 | `controller_server.FollowPath` | DWB | Regulated Pure Pursuit, vitesse 0.15 m/s, visée fixe 0.3 m, rotation sur place à 1.0 rad/s | DWB restait bloqué devant un pilier. Vitesses alignées sur `random_walker` pour une comparaison équitable. Essai T3 retenu : 28.5 % à 300 s contre 21.9 % |
+| 6 | `FollowPath.approach_velocity_scaling_dist` | 0.6 m (défaut Humble) | 0.2 m | Le robot ralentissait sur les 0.6 derniers mètres de chaque waypoint. 0.2 reste juste au-dessus de `xy_goal_tolerance` (0.15). Essai T5 |
+| 7 | `waypoint_follower.waypoint_pause_duration` | 200 ms | 0 | Pause inutile pour un balayage. Essai T5 : 59.7 % contre 54.1 % à 600 s (un run par configuration) |
 
 Vérifiés sans changement : `amcl.robot_model_type = nav2_amcl::DifferentialMotionModel`, `waypoint_follower.stop_on_failure = false`.
 La section `recoveries_server` est ignorée en Humble (le serveur s'appelle `behavior_server`) : valeurs par défaut appliquées.
 
-Essais T0 à T4 : T0 original, T1 loop_rate, T2 inflation, T3 Regulated Pure Pursuit (retenu), T4 contournements du planner (impasse).
-Essai T5 (approche et pause aux waypoints) : fichier `config/nav2_params_t5.yaml`, ticket J2-12 à faire. Non retenu à ce jour.
+Essais T0 à T5 : T0 original, T1 loop_rate, T2 inflation, T3 Regulated Pure Pursuit, T4 contournements du planner (impasse), T5 approche et pause aux waypoints.
+Configuration officielle : T5 (T3 plus les écarts 6 et 7), dans `config/nav2_params.yaml`.
 
 ---
 
@@ -296,7 +301,7 @@ Mesures : 5.00 Hz, 9.99 Hz, 0.120 m/s, 24 contre 27, 54.4 % contre 58.1 %. Les c
 
 **Conséquence pour la comparaison.** A et B sont comparées en temps simulé, chacune dans un mode dont la fidélité est vérifiée.
 Limites : modes différents, un seul run de B, facteur d'accélération dépendant de la charge de la machine.
-Run de référence B (T3, seed 1, 600 s, temps réel) : 54.1 % de couverture, 61.9 m, 1 near_collision, 69 waypoints sur 112. A (3 seeds) : 51.0 ± 6.7 %.
+Run d'essai B (T3, seed 1, 600 s, temps réel) : 54.1 % de couverture, 61.9 m, 1 near_collision, 69 waypoints sur 112 ; avec T5 (seed 5) : 59.7 %, 69.8 m, 73 waypoints. A (3 seeds) : 51.0 ± 6.7 %. Résultats officiels de B (3 runs, config T5) : voir `docs/RESULTATS.md`.
 Détails : `docs/JOURNAL.md`, entrées « Décision : simulation accélérée » et « vérification croisée ».
 
 ---

@@ -149,13 +149,13 @@ flowchart TD
     B --> C{"trajet reçu et non vide ?"}
     C -- "non" --> FIN0(["fin sans rien envoyer"])
     C -- "oui" --> D["repère map, horodatage nul<br/>sur chaque waypoint"]
-    D --> E["publier la pose initiale<br/>sur /initialpose"]
+    D --> E["enregistrer la pose initiale"]
     E --> F["attendre Nav2 actif<br/>(détail en 3.2)"]
     F --> G{"Nav2 actif ?"}
-    G -- "non" --> FIN1(["abandon, erreur journalisée"])
-    G -- "oui" --> H["envoyer FollowWaypoints"]
+    G -- "non, arrêt demandé" --> FIN1(["abandon, avertissement journalisé"])
+    G -- "oui" --> H["envoyer FollowWaypoints<br/>jusqu'à 5 essais si refusé, 2 s entre essais"]
     H --> I{"but accepté ?"}
-    I -- "non" --> FIN2(["erreur journalisée, fin"])
+    I -- "non, 5 refus" --> FIN2(["erreur journalisée, fin"])
     I -- "oui" --> J["boucle de suivi (3.3)"]
     J --> K["résultat : SUCCEEDED, CANCELED ou FAILED<br/>+ liste des waypoints manqués"]
     K --> FIN3(["fin"])
@@ -163,20 +163,34 @@ flowchart TD
 
 ### 3.2 Attente de Nav2 actif
 
-> **À vérifier.** À la lecture du code (`coverage_executor_node.py`), l'attente utilise encore `waitUntilNav2Active` de `BasicNavigator`, sans délai maximal. Elle est en cours de réécriture. Le diagramme ci-dessous décrit la **version cible** : attente maison, avec délai et nouvel essai. À mettre à jour si les délais ou le nombre d'essais changent.
+Attente maison, qui remplace `waitUntilNav2Active` de `BasicNavigator`. Aucune attente n'est sans délai : chaque interrogation du service `GetState` (`lifecycle_msgs/srv/GetState`) a un délai de 2 s, puis on réessaie. Le contrôle de l'état du contexte ROS est refait à chaque tour, donc un arrêt demandé sort de la boucle.
 
 ```mermaid
 flowchart TD
-    A(["Pose initiale publiée"]) --> B["attendre amcl et bt_navigator<br/>jusqu'à un délai maximal"]
-    B --> C{"les deux actifs<br/>avant le délai ?"}
-    C -- "oui" --> OK(["Nav2 actif"])
-    C -- "non" --> D{"essais restants ?"}
-    D -- "non" --> KO(["échec : Nav2 non actif"])
-    D -- "oui" --> E["republier la pose initiale<br/>nouvel essai"]
-    E --> B
+    A(["Début de l'attente"]) --> B["interroger /amcl/get_state<br/>délai 2 s, nouvel essai si pas de réponse"]
+    B --> C{"amcl actif ?"}
+    C -- "non" --> B
+    C -- "oui" --> D["republier la pose initiale sur /initialpose<br/>toutes les 1 s"]
+    D --> E{"/amcl_pose reçu ?"}
+    E -- "non" --> D
+    E -- "oui" --> F["interroger /bt_navigator/get_state<br/>même règle de délai"]
+    F --> G{"bt_navigator actif ?"}
+    G -- "non" --> F
+    G -- "oui" --> H["interroger /waypoint_follower/get_state"]
+    H --> I{"waypoint_follower actif ?"}
+    I -- "non" --> H
+    I -- "oui" --> J{"serveur d'action FollowWaypoints<br/>visible ? (délai 1 s par tour)"}
+    J -- "non" --> J
+    J -- "oui" --> OK(["Nav2 actif"])
+    B -. "arrêt de ROS demandé" .-> KO(["sortie sans Nav2 actif"])
+    D -. "arrêt de ROS demandé" .-> KO
+    J -. "arrêt de ROS demandé" .-> KO
 ```
 
-Raison : `BasicNavigator` n'a pas de délai d'attente. Un blocage a été observé sur 1 lancement sur 3 (message « amcl: failed to send response to /amcl/get_state (timeout) »). Voir JOURNAL, « Incident : Nav2 bloqué à l'attente d'activation ».
+- Ordre voulu : la pose initiale est republiée tant qu'AMCL n'a pas répondu, car chaque publication réinitialise le filtre ; l'intervalle d'environ 1 s laisse à AMCL le temps de répondre.
+- `waypoint_follower` est activé en dernier par le lifecycle manager. Son serveur d'action doit être visible avant l'envoi, sinon le but est rejeté. C'est aussi pourquoi l'envoi autorise jusqu'à 5 essais.
+- Raison de la réécriture : `BasicNavigator` n'a pas de délai d'attente. Un blocage a été observé sur 2 lancements sur 5, avec le message « amcl: failed to send response to /amcl/get_state (timeout) ». Voir JOURNAL, « Incident : Nav2 bloqué à l'attente d'activation » et « Correctif : blocage de l'executor au démarrage ».
+- Limite connue : l'attente d'acceptation du but dans `followWaypoints` reste sans délai (bibliothèque). Correctif à valider pendant les runs officiels.
 
 ### 3.3 Boucle de suivi
 
@@ -197,7 +211,7 @@ flowchart TD
     I -- "oui" --> B
 ```
 
-- Quatre sorties : fin du but, `max_duration` (= `run_duration` + 10 s, en temps simulé), perte du serveur pendant 3 s, arrêt de ROS ou signal d'arrêt (annulation du but).
+- Quatre sorties : fin du but, `max_duration` (= `run_duration` + 10 s, en temps simulé), perte du serveur pendant 3 s (mesurée en temps mural), arrêt de ROS ou signal d'arrêt (annulation du but).
 - Le délai de 3 s évite de sortir à tort : la découverte DDS vacille parfois sous WSL.
 - La boucle n'utilise pas `isTaskComplete()` : elle ne rendait jamais la main à l'arrêt de rclpy et fuyait en mémoire (4.8 Go). Voir JOURNAL, « Bug : fuite mémoire de coverage_executor ».
 - Résultat : en cas de but terminé, les waypoints sautés (`missed_waypoints`) sont lus dans le résultat brut de l'action et journalisés (`stop_on_failure` est à false).

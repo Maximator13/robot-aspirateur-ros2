@@ -208,7 +208,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Options envisagées** : un facteur à la fois, chacun mesuré séparément. T1 : `loop_rate` à 20. T2 : T1 plus inflation à 0.30 m et `cost_scaling` à 10 dans les deux costmaps.
 - **Choix** : T1 et T2 testés successivement, sans les cumuler sans mesure.
 - **Justification** : T1 supprime la surcharge CPU (« Processing waypoint » : 18 741 → 215 lignes ; contrôleur à 10.15 Hz en temps simulé, facteur temps réel 0.90) mais ne change pas le comportement. T2 accélère le début (+4 points à 180 s) mais le robot reste bloqué de 177 s à la fin.
-- **Résultat-leçon** : cause localisée du blocage : une ligne de balayage coupée par un pilier (waypoints (3.52, -0.67) puis (2.77, -0.67) ; pilier en x 2.96–3.27, y -0.72 à -0.42). Le robot finit le premier segment face au pilier à 0.25 m. DWB oscille (vx ≈ 0, wz ±0.03 à 0.18 rad/s) sans contourner. La surcharge CPU était un vrai défaut, mais pas la cause du blocage. Mesurer chaque correction séparément évite de conclure trop vite.
+- **Résultat-leçon** : cause localisée du blocage : une ligne de balayage coupée par un pilier (waypoints (3.52, -0.67) puis (2.77, -0.67) ; pilier en x 2.96–3.27, y -0.72 à -0.42). Le robot finit le premier segment face au pilier à 0.25 m. DWB oscille (vx ≈ 0, wz ±0.03 à 0.18 rad/s) sans contourner. La surcharge CPU était un vrai défaut, mais pas la cause du blocage. Mesurer chaque correction séparément évite de conclure trop vite. Pendant T1, la TF map→odom vue par le conteneur Nav2 est restée figée à ≈ 234 s simulées (739 messages « Transform data too old » sur tout le log) alors que le flux était publié ; phénomène non reproduit en T0 ni T2, puis revu en mode accéléré et au run officiel B3.
 
 ### 2026-10-08 · Stratégie B : contrôleur Regulated Pure Pursuit (T3)
 
@@ -312,3 +312,51 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - `rclpy` est initialisé avec `SignalHandlerOptions.NO`, pour que SIGINT lève `KeyboardInterrupt`.
 - **Justification** : cause confirmée dans le code de `nav2_simple_commander` (Humble). `_waitForNodeToActivate` appelle `spin_until_future_complete` sans délai sur la réponse du service `GetState`. Si la réponse est perdue, le processus reste bloqué dans cette attente en code C : l'interpréteur Python ne reprend jamais la main et SIGINT n'est jamais traité.
 - **Résultat-leçon** : à valider pendant les runs officiels de la stratégie B. Une bibliothèque « simple » peut cacher une attente infinie : toute attente réseau doit avoir un délai.
+
+### 2026-10-08 · Correctif : course au démarrage de Nav2 (but FollowWaypoints rejeté)
+
+- **Contexte** : le correctif d'attente de Nav2 (`wait_nav2_active`) n'attendait que `amcl` et `bt_navigator`. Le `lifecycle_manager` active les nœuds en séquence. Le but `FollowWaypoints` partait 0.5 ms après « Nav2 actif », alors que `waypoint_follower` n'était activé que 0.1 s plus tard. Résultat : « request was rejected », 2 lancements sur 2, aucun CSV produit.
+- **Options envisagées** : non consignées.
+- **Choix** : attendre aussi `waypoint_follower`, puis le serveur d'action `FollowWaypoints`. Cinq essais si le but est rejeté.
+- **Justification** : explication vérifiée dans le code de Nav2 en revue. Le serveur d'action existe dès la configuration du nœud, mais il rejette les buts tant que le nœud n'est pas activé. L'ancien `waitUntilNav2Active` masquait la course par des pauses de 2 s.
+- **Résultat-leçon** :
+  - 3 démarrages sur 3 conformes (Nav2 actif en 10 à 17 s).
+  - Un correctif peut créer un autre bug. Le test d'intégration avec vérifications de démarrage l'a attrapé avant de fausser une mesure.
+
+### 2026-10-08 · Protocole officiel B (config T5, temps réel, 600 s, 3 runs)
+
+- **Contexte** : protocole officiel de la stratégie B, config T5, en temps réel, 600 s, 3 runs.
+- **Options envisagées** : non applicable (mesure).
+- **Choix** : résultats rapportés tels quels, sans retirer de run.
+- **Justification** : comparaison A/B sur le protocole défini (3 runs, 600 s). Limite à noter : la stratégie A est mesurée en mode accéléré, la stratégie B en temps réel.
+- **Résultat-leçon** :
+  - B1 : 59.8 % de couverture, 70.2 m, 0 near_collision, 71/112 waypoints.
+  - B2 : 55.4 %, 62.2 m, 2 near_collisions, 70/112 waypoints.
+  - B3 : 17.2 %, 29.5 m, 25 near_collisions, 14/112 waypoints.
+  - Moyenne B : 44.1 ± 23.4 %. A (3 runs accélérés) : 51.0 ± 6.7 %.
+  - 80 % jamais atteint. Courbes A et B quasi superposées jusqu'à environ 7 min.
+  - Dispersion de B nettement plus forte que celle de A. Avec 3 runs, aucune conclusion statistique solide.
+
+### 2026-10-08 · Run B3 : TF figée dans Nav2 et choix de la moyenne officielle
+
+- **Contexte** : à environ 135 s simulées, la TF `map → odom` vue par le conteneur Nav2 reste figée (4 329 messages « Transform data too old »). Le rosbag montre qu'AMCL la publie sans interruption (5 Hz, aucun trou supérieur à 1 s). Nav2 croit le robot immobile : 42 « Failed to make progress », puis recoveries, et 71 « Behavior Tree tick rate exceeded ». Même phénomène déjà vu en essai T1 et en mode accéléré. Cause non identifiée (charge CPU sous WSL, DDS, buffer TF ?).
+- **Options envisagées** : garder B3 dans la moyenne ; garder B3 et ajouter un 4e run ; diagnostiquer d'abord ; exclure B3.
+- **Choix** (de l'étudiant) : garder B3 dans la moyenne officielle, et indiquer à côté « 2 runs sur 3 terminés normalement : 57.6 % ».
+- **Justification** : ne pas écarter un résultat après l'avoir vu. C'est une limite de fiabilité de la stratégie B dans notre environnement, à présenter comme telle.
+- **Résultat-leçon** : la fiabilité fait partie de la performance. Une stratégie plus « intelligente » dépend d'une pile logicielle plus lourde et plus fragile.
+
+### 2026-10-08 · Refactoring de lisibilité de coverage_executor et non-régression
+
+- **Contexte** : après le protocole officiel, la fonction d'attente de Nav2 de `coverage_executor` (environ 55 lignes, 3 boucles imbriquées) est difficile à défendre devant le jury. Le code a changé après les mesures.
+- **Options envisagées** : non précisées dans le compte rendu source (à compléter si nécessaire).
+- **Choix** : découpage de la fonction d'attente en petites fonctions (attente d'un nœud actif, attente de la pose initiale, attente du serveur d'action). Annulation protégée regroupée dans une seule fonction.
+- **Justification** : un nœud = une responsabilité, et chaque fonction doit pouvoir être expliquée en une phrase. Comme le code a changé après les mesures, un essai de non-régression en simulation a été fait (120 s, temps réel).
+- **Résultat-leçon** : séquence de démarrage conforme (amcl actif, pose initiale, bt_navigator actif, waypoint_follower actif, Nav2 actif, 112 waypoints). Couverture à 60 s et 120 s : 7.6 % et 15.4 %, à comparer aux runs officiels B1/B2 (8.4 à 8.5 % et 15.6 à 16.2 %). Arrêt automatique à `max_duration` avec annulation du but (« Goal was canceled. Stopping the robot. »). Arrêt manuel par SIGINT en 1 s. Toute modification faite après une mesure demande une non-régression, même si elle semble purement cosmétique. Il s'agit d'un seul essai, pas d'une campagne.
+
+### 2026-10-08 · Découverte : SIGINT ignoré par les processus lancés en arrière-plan
+
+- **Contexte** : pendant la journée, plusieurs processus `coverage_executor` survivaient à Ctrl+C. Un `kill -INT` envoyé directement à l'executor était ignoré. `/proc/<pid>/status` montrait SIGINT dans les signaux ignorés.
+- **Options envisagées** : non consignées.
+- **Choix** : relancer le test avec SIGINT remis par défaut, et ne pas modifier le code de l'executor pour ce motif.
+- **Justification** : un processus lancé en arrière-plan (`&`, `nohup`) par un shell non interactif hérite d'un SIGINT ignoré. Python n'installe alors pas son gestionnaire de SIGINT. Ce mécanisme explique au moins en partie les executors survivants observés. Ce n'était donc pas uniquement un défaut de notre code.
+- **Résultat-leçon** : avant de conclure à un bug du code testé, vérifier l'outil de test (signaux hérités, environnement du shell). La méthode de test a été corrigée.
