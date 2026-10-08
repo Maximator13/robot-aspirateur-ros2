@@ -1,0 +1,12 @@
+# Artefacts colcon
+build/
+install/
+log/
+# Dépendance clonée (dépôt git à part, non modifiée)
+src/turtlebot3_simulations/
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+# Rosbags (volumineux) — les CSV et PNG de results/ restent versionnés
+results/bags/
