@@ -17,6 +17,8 @@ Principe et complexité (N = nb de cellules, K = nb de cellules du disque d'éro
 - boustrophédon : une ligne sur `spacing`, découpée en segments contigus, O(N).
 - transitions : test de ligne de vue exact O(L / résolution) par paire de waypoints ;
   si bloquée, Dijkstra 8-voisinage O(N log N) puis lissage par ligne de vue.
+  Non utilisé par défaut (plan_transitions=False dans coverage_planner) — essai T4
+  négatif, voir docs/JOURNAL.md.
 """
 
 import heapq
@@ -443,6 +445,9 @@ def detour_points(reachable, wp_a, wp_b, origin_x, origin_y, resolution, max_ste
 
 def plan_transitions(reachable, waypoints, origin_x, origin_y, resolution, max_step=0.3):
     """Insère des points de contournement entre waypoints séparés par un obstacle.
+
+    Non utilisé par défaut — essai T4 négatif, voir docs/JOURNAL.md (Nav2 avec
+    Regulated Pure Pursuit contourne déjà ; les points intermédiaires multipliaient les arrêts).
 
     - Paire dont la ligne droite reste dans `reachable` : gardée telle quelle.
     - Sinon : plus court chemin dans le masque, lissé, découpé en tronçons

@@ -1,4 +1,4 @@
-# aspi : configuration Nav2 OFFICIELLE de la stratégie B (= essai T3 retenu).
+# aspi : configuration Nav2 OFFICIELLE de la stratégie B (= essai T5 retenu).
 # Source : /opt/ros/humble/share/turtlebot3_navigation2/param/humble/burger.yaml (version Humble).
 # Écarts par rapport à l'original (chacun marqué "# aspi" à l'endroit modifié) :
 #   1. use_sim_time: True partout (simulation Gazebo).
@@ -7,9 +7,11 @@
 #   4. local_costmap et global_costmap / inflation_layer : inflation_radius 0.30 et cost_scaling_factor 10.0.
 #   5. controller_server / FollowPath : DWB remplacé par Regulated Pure Pursuit
 #      (desired_linear_vel 0.15, lookahead fixe 0.3, rotate_to_heading, régulations de vitesse désactivées).
+#   6. FollowPath : approach_velocity_scaling_dist 0.6 -> 0.2 (essai T5).
+#   7. waypoint_follower : waypoint_pause_duration 200 -> 0 ms (essai T5).
 # Vérifiés sans changement : amcl.robot_model_type = nav2_amcl::DifferentialMotionModel,
 #   waypoint_follower.stop_on_failure = false.
-# Essais de réglage T0-T4 : voir docs/JOURNAL.md (results/reglages_B/).
+# Essais de réglage T0-T5 : voir docs/JOURNAL.md (results/reglages_B/).
 amcl:
   ros__parameters:
     use_sim_time: True  # aspi : simulation
@@ -152,6 +154,7 @@ controller_server:
       max_allowed_time_to_collision_up_to_carrot: 1.0  # aspi (essai T3)
       use_regulated_linear_velocity_scaling: false  # aspi (essai T3) : le planner de couverture garantit déjà la marge (érosion) ; ralentir dans les courbes serrées n'apporte rien à vitesse déjà basse
       use_cost_regulated_linear_velocity_scaling: false  # aspi (essai T3) : ralentir près des murs pénaliserait le balayage (lignes le long des obstacles)
+      approach_velocity_scaling_dist: 0.2  # aspi (essai T5) : défaut Humble 0.6 m (ralentit jusqu'à min_approach_linear_velocity 0.05 m/s sur les 0.6 derniers mètres de chaque waypoint) ; 0.2 = juste au-dessus de xy_goal_tolerance 0.15
 
 controller_server_rclcpp_node:
   ros__parameters:
@@ -338,4 +341,4 @@ waypoint_follower:
     wait_at_waypoint:
       plugin: "nav2_waypoint_follower::WaitAtWaypoint"
       enabled: True
-      waypoint_pause_duration: 200
+      waypoint_pause_duration: 0  # aspi (essai T5) : 200 ms -> 0, pause inutile pour un balayage

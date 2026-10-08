@@ -244,3 +244,71 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : aucune correction ; les deux résultats sont valides (0 transition non résolue, 0 tronçon hors masque).
 - **Justification** : la résolution de `nav_msgs/OccupancyGrid` est un float32 (0.05 devient 0.05000000074…). Cet arrondi minime déplace quelques points de simplification situés exactement sur des frontières de cellules.
 - **Résultat-leçon** : connaître les types des messages ROS (float32) quand on compare un calcul hors ligne et un calcul en ligne.
+
+### 2026-10-08 · Stratégie B : vérification croisée temps réel / accéléré (négative)
+
+- **Contexte** : même vérification que pour la stratégie A, appliquée à la stratégie B (config T3, seed 1, 600 s). Le risque avait été identifié en revue : les boucles de Nav2 sont peut-être cadencées en temps mural.
+- **Options envisagées** : accepter le mode accéléré pour B ; mesurer B en temps réel uniquement. Critères fixés avant les runs :
+  - C1 : fréquence de `/cmd_vel_nav` à 10 Hz ± 10 % en temps simulé ;
+  - C2 : fréquence de `/scan` à 5 Hz ± 10 % ;
+  - C3 : % final ± 5 points ;
+  - C4 : nombre de waypoints atteints ± 10 % ;
+  - C5 : nombre d'incidents ≤ valeur en temps réel + 3.
+- **Choix** : mesure de B en temps réel uniquement. La stratégie A reste en mode accéléré, validé par ses propres critères.
+- **Justification** : ce qui est comparé est le % couvert en fonction du temps simulé. Chaque stratégie doit donc être mesurée dans un mode où son comportement en temps simulé est vérifié fidèle.
+- **Résultats** (valeurs F = accéléré, R = temps réel) :
+  - C1 KO : F 4.42 Hz, R 9.56 Hz ;
+  - C2 OK : F 5.00 Hz ;
+  - C3 « OK » en apparence : F 56.8 %, R 54.1 %. Trompeur : les courbes divergent (F 53.6 %, R 29.0 % à 300 s) ;
+  - C4 KO : F 8 waypoints, R 69 ;
+  - C5 KO : F 85 incidents, R 1.
+  - En F, la TF `map → odom` d'AMCL reste figée à 89 s simulées (2 292 messages « Transform data too old »), avec 55 near_collisions. F a parcouru 510 m en zigzags et recoveries, contre 61.9 m en R. Facteur d'accélération obtenu : environ 1.9 seulement.
+- **Résultat-leçon** : le mode accéléré est négatif pour B. Un critère isolé (C3) peut sembler bon par hasard : il faut plusieurs critères, dont des critères de comportement. Le risque identifié en revue était fondé.
+
+### 2026-10-08 · Stratégie B : run de référence en temps réel (T3, seed 1)
+
+- **Contexte** : premier run de référence de la stratégie B, config T3, seed 1, 600 s, en temps réel.
+- **Options envisagées** : non applicable (mesure).
+- **Choix** : ce run est retenu comme référence de B, en temps réel, suite à la vérification croisée négative de l'entrée précédente.
+- **Justification** : seul mode de mesure validé pour la stratégie B.
+- **Résultat-leçon** :
+  - Couverture finale : 54.1 % (A : 51.0 ± 6.7 %). 80 % non atteint. Distance : 61.9 m. near_collisions : 1.
+  - Waypoints : 69 atteints sur 112. Un « Failed to make progress », 0 recovery. Facteur temps réel : 0.94.
+  - L'executor s'arrête seul à `max_duration` (610 s). Sa mémoire reste stable, environ 74 Mo : le correctif de fuite est confirmé.
+  - Limite : un seul run, donc aucune conclusion statistique.
+
+### 2026-10-08 · Incident : Nav2 bloqué à l'attente d'activation (run B)
+
+- **Contexte** : au premier lancement du run R, l'executor est resté bloqué sur l'attente de Nav2 (`waitUntilNav2Active`). Avertissement précédent dans le log : « amcl: failed to send response to /amcl/get_state (timeout) ». Fréquence : 1 lancement sur 3.
+- **Options envisagées** : non consignées.
+- **Choix** : procédure. Si Nav2 n'est pas actif 90 s après le lancement, arrêter et relancer. Le cas est noté comme incident.
+- **Justification** : `BasicNavigator` n'a pas de délai d'attente. La sortie doit donc être gérée à l'extérieur du nœud.
+- **Résultat-leçon** : un blocage intermittent ne doit pas être pris pour un résultat. Limite à noter dans `docs/RESULTATS.md`.
+
+### 2026-10-08 · Essai T5 : suppression du ralentissement aux waypoints
+
+- **Contexte** : en revue, le relecteur a relevé deux pertes de temps dans la configuration T3. Le contrôleur RPP ralentit avant chaque but (`approach_velocity_scaling_dist`, défaut 0.6 m, jusqu'à `min_approach_linear_velocity`). Le `waypoint_follower` marque en outre une pause de 200 ms à chaque waypoint. Estimation non mesurée : plusieurs minutes perdues sur 10.
+- **Options envisagées** : garder T3 ; réduire le ralentissement et la pause (T5).
+- **Choix** : `approach_velocity_scaling_dist` = 0.2 m (juste au-dessus de `xy_goal_tolerance` = 0.15 m) et `waypoint_pause_duration` = 0. T5 devient la configuration officielle (`nav2_params.yaml`). Fin des réglages de la stratégie B.
+- **Justification** : mesure en temps réel, 600 s, T3 (seed 1) contre T5 (seed 5).
+  - Couverture à 300 s : 29.0 % contre 30.6 %.
+  - Couverture à 450 s : 39.8 % contre 47.3 %.
+  - Couverture finale : 54.1 % contre 59.7 %.
+  - Waypoints atteints : 69 contre 73.
+  - Distance : 61.9 m contre 69.8 m.
+  - Vitesse moyenne en translation : 0.131 m/s contre 0.147 m/s.
+  - Rotation sur place : 18 % du temps dans les deux cas.
+  - Recoveries : 0 dans les deux cas. T5 a eu 2 « controller patience exceeded », soit environ 5 s perdues.
+- **Résultat-leçon** : gain net sur le même protocole, mais un seul run par configuration : la différence ne suffit pas à conclure statistiquement. Restent 18 % du temps en rotation sur place et quelques arrêts d'environ 30 s sur les petits segments entre lignes ; ce sont les perspectives de la stratégie B.
+
+### 2026-10-08 · Correctif : blocage de l'executor au démarrage
+
+- **Contexte** : sur 5 lancements, l'executor est resté bloqué 2 fois au démarrage. Avertissement dans le log : « amcl: failed to send response to /amcl/get_state (timeout) ».
+- **Options envisagées** : non consignées.
+- **Choix** :
+  - fonction locale `wait_nav2_active` : interrogation du service `GetState` avec un délai de 2 s et un nouvel essai ;
+  - la pose initiale est republiée jusqu'à réception sur `/amcl_pose` ;
+  - plus aucune attente sans délai dans l'executor ;
+  - `rclpy` est initialisé avec `SignalHandlerOptions.NO`, pour que SIGINT lève `KeyboardInterrupt`.
+- **Justification** : cause confirmée dans le code de `nav2_simple_commander` (Humble). `_waitForNodeToActivate` appelle `spin_until_future_complete` sans délai sur la réponse du service `GetState`. Si la réponse est perdue, le processus reste bloqué dans cette attente en code C : l'interpréteur Python ne reprend jamais la main et SIGINT n'est jamais traité.
+- **Résultat-leçon** : à valider pendant les runs officiels de la stratégie B. Une bibliothèque « simple » peut cacher une attente infinie : toute attente réseau doit avoir un délai.

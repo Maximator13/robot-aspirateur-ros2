@@ -1,8 +1,10 @@
 # Algorigrammes
 
 Les slides ne contiennent pas de code : ces algorigrammes les remplacent.
-Fidèles à `random_logic.py`, `random_walker_node.py`, `planning.py` et `coverage_tracker_node.py`.
-Le planner (stratégie B) est décrit ici au niveau de `planning.py` ; le nœud `coverage_planner` s'y ajoute (voir ARCHITECTURE.md).
+Fidèles à `random_logic.py`, `random_walker_node.py`, `planning.py`, `coverage_planner_node.py`,
+`coverage_executor_node.py` et `coverage_tracker_node.py`.
+Le planner (stratégie B) est décrit ici au niveau de `planning.py`, puis du nœud `coverage_planner`.
+L'executor (section 3) enchaîne l'envoi du trajet à Nav2.
 
 ---
 
@@ -112,9 +114,97 @@ flowchart TD
 - Limite assumée : ce n'est pas une décomposition cellulaire de Choset. Quand un obstacle coupe une ligne, les segments sont enchaînés dans l'ordre. Le contournement est laissé au planificateur de Nav2.
 - Sur la carte `world` : 112 waypoints.
 
+### 2.3 Nœud `coverage_planner` (à chaque `/map` reçu)
+
+```mermaid
+flowchart TD
+    A(["/map reçu"]) --> B["grille d'occupation vers masque libre"]
+    B --> C["cellule de départ = position 0, 0 du monde"]
+    C --> D{"départ dans la carte ?"}
+    D -- "non" --> E1(["erreur journalisée, rien publié"])
+    D -- "oui" --> F["masque atteignable (2.1)"]
+    F --> G{"masque vide ?"}
+    G -- "oui" --> E2(["erreur journalisée, rien publié"])
+    G -- "non" --> H["waypoints boustrophédon (2.2)"]
+    H -.-> I{{"option plan_transitions<br/>DÉSACTIVÉE par défaut"}}
+    I -.-> J["contournements entre segments séparés<br/>par un obstacle : plus court chemin dans le masque,<br/>lissé, tronçons de 0.3 m au plus"]
+    H --> K["construire le Path, repère map<br/>un yaw par waypoint"]
+    J -.-> K
+    K --> L(["publier /coverage_path<br/>RELIABLE + TRANSIENT_LOCAL"])
+```
+
+- Une seule publication par carte reçue. Le QoS TRANSIENT_LOCAL permet à l'executor, lancé en même temps, de recevoir le trajet même s'il s'abonne après.
+- Pointillés : `plan_transitions` est une option de launch, désactivée. Essai T4 négatif : 112 devient 245 waypoints, mais la couverture à 300 s tombe à 22.3 % contre 28.5 % (Nav2 avec Regulated Pure Pursuit contourne déjà les obstacles ; les points intermédiaires multiplient arrêts et rotations).
+- Le code est conservé et testé (8 tests unitaires) : une impasse documentée.
+
 ---
 
-## 3. coverage_tracker (mesure commune A et B)
+## 3. coverage_executor (stratégie B)
+
+### 3.1 Déroulement général
+
+```mermaid
+flowchart TD
+    A(["Démarrage du nœud"]) --> B["attendre /coverage_path<br/>message toutes les 10 s"]
+    B --> C{"trajet reçu et non vide ?"}
+    C -- "non" --> FIN0(["fin sans rien envoyer"])
+    C -- "oui" --> D["repère map, horodatage nul<br/>sur chaque waypoint"]
+    D --> E["publier la pose initiale<br/>sur /initialpose"]
+    E --> F["attendre Nav2 actif<br/>(détail en 3.2)"]
+    F --> G{"Nav2 actif ?"}
+    G -- "non" --> FIN1(["abandon, erreur journalisée"])
+    G -- "oui" --> H["envoyer FollowWaypoints"]
+    H --> I{"but accepté ?"}
+    I -- "non" --> FIN2(["erreur journalisée, fin"])
+    I -- "oui" --> J["boucle de suivi (3.3)"]
+    J --> K["résultat : SUCCEEDED, CANCELED ou FAILED<br/>+ liste des waypoints manqués"]
+    K --> FIN3(["fin"])
+```
+
+### 3.2 Attente de Nav2 actif
+
+> **À vérifier.** À la lecture du code (`coverage_executor_node.py`), l'attente utilise encore `waitUntilNav2Active` de `BasicNavigator`, sans délai maximal. Elle est en cours de réécriture. Le diagramme ci-dessous décrit la **version cible** : attente maison, avec délai et nouvel essai. À mettre à jour si les délais ou le nombre d'essais changent.
+
+```mermaid
+flowchart TD
+    A(["Pose initiale publiée"]) --> B["attendre amcl et bt_navigator<br/>jusqu'à un délai maximal"]
+    B --> C{"les deux actifs<br/>avant le délai ?"}
+    C -- "oui" --> OK(["Nav2 actif"])
+    C -- "non" --> D{"essais restants ?"}
+    D -- "non" --> KO(["échec : Nav2 non actif"])
+    D -- "oui" --> E["republier la pose initiale<br/>nouvel essai"]
+    E --> B
+```
+
+Raison : `BasicNavigator` n'a pas de délai d'attente. Un blocage a été observé sur 1 lancement sur 3 (message « amcl: failed to send response to /amcl/get_state (timeout) »). Voir JOURNAL, « Incident : Nav2 bloqué à l'attente d'activation ».
+
+### 3.3 Boucle de suivi
+
+```mermaid
+flowchart TD
+    A(["But envoyé, temps de départ mémorisé"]) --> B["traiter les messages ROS pendant 0.1 s"]
+    B --> C{"résultat de l'action disponible ?"}
+    C -- "oui" --> RES(["sortie : lire le résultat"])
+    C -- "non" --> D["si le waypoint courant a changé :<br/>journaliser n sur total"]
+    D --> E{"serveur FollowWaypoints<br/>absent depuis 3 s ?"}
+    E -- "oui" --> F["annuler le but avec délai de 2 s"]
+    F --> STOP1(["arrêt de l'executor"])
+    E -- "non" --> G{"temps simulé écoulé<br/>supérieur ou égal à max_duration ?"}
+    G -- "oui" --> H["annuler le but avec délai de 5 s"]
+    H --> STOP2(["arrêt de l'executor"])
+    G -- "non" --> I{"ROS encore actif ?"}
+    I -- "non" --> STOP3(["fin sans résultat"])
+    I -- "oui" --> B
+```
+
+- Quatre sorties : fin du but, `max_duration` (= `run_duration` + 10 s, en temps simulé), perte du serveur pendant 3 s, arrêt de ROS ou signal d'arrêt (annulation du but).
+- Le délai de 3 s évite de sortir à tort : la découverte DDS vacille parfois sous WSL.
+- La boucle n'utilise pas `isTaskComplete()` : elle ne rendait jamais la main à l'arrêt de rclpy et fuyait en mémoire (4.8 Go). Voir JOURNAL, « Bug : fuite mémoire de coverage_executor ».
+- Résultat : en cas de but terminé, les waypoints sautés (`missed_waypoints`) sont lus dans le résultat brut de l'action et journalisés (`stop_on_failure` est à false).
+
+---
+
+## 4. coverage_tracker (mesure commune A et B)
 
 ```mermaid
 flowchart TD

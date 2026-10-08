@@ -26,15 +26,18 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 
 | Id | Description | Responsable | Dépend de | Critère de fini | Statut |
 |---|---|---|---|---|---|
-| J2-01 | `config/nav2_params.yaml` (copie de `turtlebot3_navigation2/param/humble/burger.yaml`, écarts documentés) | développeur ROS | — | YAML valide, écarts commentés | EN COURS |
-| J2-02 | `coverage_planner_node.py` (`/map` → `/coverage_path`) + displays Nav2 dans `rviz/aspi.rviz` | développeur ROS | — | build OK, trajet visible dans RViz | EN COURS |
-| J2-03 | `coverage_executor_node.py` (BasicNavigator, `followWaypoints`) + arrêt propre du `random_walker` | développeur ROS | — | build OK | EN COURS |
-| J2-04 | `launch/sim.launch.py` (Gazebo commun A/B), `aspi_random` l'inclut, `aspi_planned.launch.py` | chef de projet | J2-01..03 | Les deux launch démarrent | EN COURS |
+| J2-01 | `config/nav2_params.yaml` (copie de `turtlebot3_navigation2/param/humble/burger.yaml`, écarts documentés) | développeur ROS | — | YAML valide, écarts commentés | FINI |
+| J2-02 | `coverage_planner_node.py` (`/map` → `/coverage_path`) + displays Nav2 dans `rviz/aspi.rviz` | développeur ROS | — | build OK, trajet visible dans RViz | FINI |
+| J2-03 | `coverage_executor_node.py` (BasicNavigator, `followWaypoints`) + arrêt propre du `random_walker` | développeur ROS | — | build OK | FINI |
+| J2-04 | `launch/sim.launch.py` (Gazebo commun A/B), `aspi_random` l'inclut, `aspi_planned.launch.py` | chef de projet | J2-01..03 | Les deux launch démarrent | FINI |
 | J2-05 | `docs/ARCHITECTURE.md` + `docs/ALGORIGRAMMES.md` (A maintenant, B une fois le code écrit) | rédacteur technique | — | Mermaid fidèle au code | EN COURS |
-| J2-06 | Revue J2-01..04 | relecteur | J2-01..04 | Aucun BLOQUANT | À FAIRE |
-| J2-07 | Nav2 seul : un goal manuel atteint (par script, temps réel) | ingénieur test | J2-06 | Goal atteint, AMCL localisé | À FAIRE |
-| J2-08 | Run B complet en temps réel + non-régression de A (smoke test du launch refactorisé) | ingénieur test | J2-07 | CSV BOUSTROPHEDON | À FAIRE |
-| J2-09 | Vérification croisée B temps réel vs accéléré (mêmes critères que A) | ingénieur test | J2-08 | Décision chiffrée | À FAIRE |
+| J2-06 | Revue J2-01..04 | relecteur | J2-01..04 | Aucun BLOQUANT | FINI |
+| J2-07 | Nav2 seul : un goal manuel atteint (par script, temps réel) | ingénieur test | J2-06 | Goal atteint, AMCL localisé | FINI |
+| J2-08 | Run B complet en temps réel + non-régression de A (smoke test du launch refactorisé) | ingénieur test | J2-07 | CSV BOUSTROPHEDON | FINI |
+| J2-09 | Vérification croisée B temps réel vs accéléré (mêmes critères que A) | ingénieur test | J2-08 | Décision chiffrée | FINI (KO : B en temps réel) |
+| J2-11 | Essais de réglage B T0–T4 (300 s) : loop_rate, inflation, contrôleur RPP, contournements du planner | ingénieur test + développeur ROS + ingénieur algorithmes | J2-08 | Réglage retenu chiffré | FINI (T3 retenu, T4 négatif) |
+| J2-12 | Essai T5 : suppression du ralentissement d'approche (approach_velocity_scaling_dist 0.2) et de la pause aux waypoints | développeur ROS + ingénieur test | J2-09 | Gain mesuré | FINI (59.7 % vs 54.1 % à 600 s, T5 retenu) |
+| J2-13 | Protocole B (600 s, 3 runs, temps réel, config T5) + comparaison A/B | ingénieur test + analyste résultats | J2-09, J2-12 | Courbe A vs B | EN COURS |
 | J2-10 | Journal du jour 2 | opérateur / scribe | toutes | Entrées au format du brief | EN COURS |
 
 ### Contrats jour 2 (fixés par l'architecte)
@@ -44,7 +47,9 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
   TRANSIENT_LOCAL), calcule `reachable_mask` puis `boustrophedon_waypoints` (fonctions de `planning.py`, les
   mêmes que le tracker), publie **une fois par carte reçue** `/coverage_path` (`nav_msgs/Path`, frame `map`,
   RELIABLE + TRANSIENT_LOCAL pour un abonné tardif). Log : nb de cellules atteignables et de waypoints.
-- **`coverage_executor`** — paramètres : `initial_x` (0.0), `initial_y` (0.0), `initial_yaw` (0.0).
+- **`coverage_planner` (ajout jour 2)** — `plan_transitions` (False : essai T4 négatif), `transition_step` (0.3 m).
+- **`coverage_executor`** — paramètres : `initial_x` (0.0), `initial_y` (0.0), `initial_yaw` (0.0),
+  `max_duration` (0.0 = illimité ; le launch le règle à `run_duration + 10` s : arrêt propre après la mesure).
   Structure simple et séquentielle (pas de callback bloquant) : `BasicNavigator` → attendre `/coverage_path`
   (spin_once) → `setInitialPose` → `waitUntilNav2Active()` → `followWaypoints(poses)` → boucle
   `isTaskComplete()` avec log de progression → résultat + `missed_waypoints` loggués. Horodatage via l'horloge
@@ -52,6 +57,9 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 - **Nav2** : `waypoint_follower.stop_on_failure: false` (waypoint inaccessible = sauté, conforme au brief).
   Tolérance d'arrivée `xy_goal_tolerance` abaissée de 0.25 à 0.15 m : avec un espacement de balayage de 0.18 m,
   0.25 m permettrait de « couper » les extrémités des lignes.
+  Réglage retenu après essais T0–T4 : `loop_rate` 20, inflation 0.30 m / `cost_scaling_factor` 10, contrôleur
+  Regulated Pure Pursuit à 0.15 m/s (= vitesse du random_walker) à la place de DWB ; essai T5 :
+  `approach_velocity_scaling_dist` 0.2 et `waypoint_pause_duration` 0 (config finale).
 - **Tracker** : inchangé, lancé avec `strategy: BOUSTROPHEDON`. Mesure à partir du 1er déplacement (le temps
   d'activation de Nav2 n'est pas compté).
 
