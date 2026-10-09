@@ -5,6 +5,7 @@ wait_nav2_active -> followWaypoints -> suivi de la progression.
 """
 import math
 import signal
+import sys
 import time
 
 import rclpy
@@ -12,11 +13,27 @@ from builtin_interfaces.msg import Time
 from geometry_msgs.msg import PoseStamped
 from lifecycle_msgs.srv import GetState
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-from nav_msgs.msg import Path
+from nav_msgs.msg import Odometry, Path
 from rclpy.executors import ExternalShutdownException
 from rclpy.qos import (QoSDurabilityPolicy, QoSProfile,
-                       QoSReliabilityPolicy)
+                       QoSReliabilityPolicy, qos_profile_sensor_data)
 from rclpy.signals import SignalHandlerOptions
+
+from aspi_bot.progress_check import ProgressMonitor, segment_length
+
+
+class Nav2Timeout(Exception):
+    """Nav2 pas actif avant le délai global `nav2_timeout` (temps monotone)."""
+
+    def __init__(self, manquant):
+        super().__init__(manquant)
+        self.manquant = manquant
+
+
+def verifier_delai(deadline, manquant):
+    """Lève Nav2Timeout si le délai global (time.monotonic) est dépassé."""
+    if time.monotonic() > deadline:
+        raise Nav2Timeout(manquant)
 
 
 def pause(nav, duree):
@@ -45,6 +62,66 @@ def wait_for_path(nav):
             nav.get_logger().info(
                 f'En attente de /coverage_path ({waited} s)...')
     return received[0] if received else None
+
+
+class OdomDistance:
+    """Cumule la distance parcourue d'après /odom (somme des normes entre positions)."""
+
+    def __init__(self, nav):
+        self.total = 0.0
+        self.count = 0  # nombre de messages reçus (0 = pas d'odométrie)
+        self._last = None
+        # Best effort : compatible avec un éditeur fiable OU best effort
+        # (un abonné fiable ne recevrait rien d'un éditeur best effort).
+        nav.create_subscription(Odometry, '/odom', self._on_odom,
+                                qos_profile_sensor_data)
+
+    def _on_odom(self, msg):
+        p = msg.pose.pose.position
+        if self._last is not None:
+            self.total += math.hypot(p.x - self._last[0], p.y - self._last[1])
+        self._last = (p.x, p.y)
+        self.count += 1
+
+
+def check_validated(nav, monitor, odom, poses, start_xy, last_wp, new_wp, state):
+    """Contrôle les waypoints validés par Nav2 entre deux feedbacks.
+
+    Waypoints validés = indices last_wp .. new_wp-1. Pour chacun,
+    expected = longueur du segment depuis le précédent (le 1er : depuis la pose
+    initiale). Règle si plusieurs waypoints sont validés d'un coup : la distance
+    odométrique ET le temps écoulé (horloge du nœud) depuis la dernière validation
+    sont répartis au prorata des segments attendus (même ratio pour tous). Ainsi
+    un lot lent (waypoints sautés après échec Nav2) donne des temps élevés, un lot
+    instantané sans mouvement reste suspect.
+    Retourne True si une progression anormale est détectée.
+    """
+    log = nav.get_logger()
+    traveled = odom.total - state['odom_at_last']
+    state['odom_at_last'] = odom.total
+    now = nav.get_clock().now()
+    delta_t = (now - state['time_at_last']).nanoseconds / 1e9
+    state['time_at_last'] = now
+    idx = list(range(max(last_wp, 0), new_wp))
+    pts = [start_xy] + [(p.pose.position.x, p.pose.position.y) for p in poses]
+    expected = [segment_length(pts[i], pts[i + 1]) for i in idx]  # pts[i] = précédent
+    total = sum(expected)
+    for i, exp in zip(idx, expected):
+        ratio = exp / total if total > 0.0 else 1.0 / len(idx)
+        share = traveled * ratio
+        dt = delta_t * ratio
+        if monitor.on_waypoint_reached(exp, share, dt):
+            # Partie « en moins de X s » seulement si le critère de temps est actif
+            if math.isfinite(monitor.max_elapsed):
+                critere = f' en moins de {monitor.max_elapsed:g} s'
+            else:
+                critere = ''
+            log.error(f'progression anormale : {monitor.suspects} waypoints validés '
+                      f'sans déplacement réel (odométrie){critere} — arrêt '
+                      f'(waypoint {i + 1}/{len(poses)} : attendu {exp:.2f} m, '
+                      f'parcouru {share:.2f} m, en {dt:.1f} s)')
+            return True
+    return False
 
 
 def make_initial_pose(nav):
@@ -76,7 +153,7 @@ def cancel_task(nav, timeout=5.0):
         nav.get_logger().warn(f'Annulation impossible : {err}')
 
 
-def wait_node_active(nav, name, timeout=2.0):
+def wait_node_active(nav, name, deadline, timeout=2.0):
     """Attend que le nœud lifecycle `name` soit actif (service GetState).
 
     Pourquoi pas nav.waitUntilNav2Active() ? Sa boucle appelle
@@ -91,6 +168,7 @@ def wait_node_active(nav, name, timeout=2.0):
     client = nav.create_client(GetState, f'/{name}/get_state')
     active = False
     while rclpy.ok() and not active:
+        verifier_delai(deadline, name)
         if not client.wait_for_service(timeout_sec=1.0):
             log.info(f'/{name}/get_state indisponible, attente...',
                      throttle_duration_sec=5.0)
@@ -115,7 +193,7 @@ def wait_node_active(nav, name, timeout=2.0):
     return True
 
 
-def wait_initial_pose(nav):
+def wait_initial_pose(nav, deadline):
     """Republie la pose initiale jusqu'à la réception de /amcl_pose.
 
     Même boucle que _waitForInitialPose de BasicNavigator (callback du navigator
@@ -124,6 +202,7 @@ def wait_initial_pose(nav):
     """
     log = nav.get_logger()
     while rclpy.ok() and not nav.initial_pose_received:
+        verifier_delai(deadline, 'amcl (pas de /amcl_pose après la pose initiale)')
         # Même appel que _waitForInitialPose ; API privée de BasicNavigator,
         # elle peut changer selon la version de nav2_simple_commander.
         nav._setInitialPose()
@@ -131,10 +210,11 @@ def wait_initial_pose(nav):
         pause(nav, 1.0)
 
 
-def wait_action_server(nav):
+def wait_action_server(nav, deadline):
     """Attend le serveur d'action FollowWaypoints (boucle bornée, interruptible)."""
     while rclpy.ok() and not nav.follow_waypoints_client.wait_for_server(
             timeout_sec=1.0):
+        verifier_delai(deadline, 'waypoint_follower (serveur d\'action FollowWaypoints)')
         nav.get_logger().info('Serveur FollowWaypoints indisponible, attente...',
                               throttle_duration_sec=5.0)
 
@@ -145,15 +225,22 @@ def wait_nav2_active(nav):
     Le lifecycle_manager active les nœuds en séquence : waypoint_follower (dernier,
     il dépend de bt_navigator) doit être actif ET son serveur d'action visible
     avant d'envoyer FollowWaypoints, sinon le but est rejeté.
+    Délai global `nav2_timeout` (temps monotone) : lève Nav2Timeout au-delà.
     """
-    if not wait_node_active(nav, 'amcl'):
+    deadline = time.monotonic() + nav.get_parameter('nav2_timeout').value
+    if nav.get_parameter('use_amcl').value:
+        nav.get_logger().info('Mode use_amcl=True : attente d\'amcl + pose initiale')
+        if not wait_node_active(nav, 'amcl', deadline):
+            return False
+        wait_initial_pose(nav, deadline)
+    else:
+        nav.get_logger().info('Mode use_amcl=False (localisation statique) : '
+                              'amcl et pose initiale ignorés')
+    if not wait_node_active(nav, 'bt_navigator', deadline):
         return False
-    wait_initial_pose(nav)
-    if not wait_node_active(nav, 'bt_navigator'):
+    if not wait_node_active(nav, 'waypoint_follower', deadline):
         return False
-    if not wait_node_active(nav, 'waypoint_follower'):
-        return False
-    wait_action_server(nav)
+    wait_action_server(nav, deadline)
     if rclpy.ok():
         nav.get_logger().info('Nav2 actif')
     return rclpy.ok()
@@ -179,9 +266,18 @@ def run(nav):
 
     # Ordre recommandé : pose initiale AVANT l'attente de Nav2
     # (wait_initial_pose la republie jusqu'à recevoir /amcl_pose).
-    nav.setInitialPose(make_initial_pose(nav))
-    log.info('Attente de Nav2 (amcl + bt_navigator + waypoint_follower)...')
-    if not wait_nav2_active(nav):
+    if nav.get_parameter('use_amcl').value:
+        nav.setInitialPose(make_initial_pose(nav))
+    log.info('Attente de Nav2 (amcl + bt_navigator + waypoint_follower)...'
+             if nav.get_parameter('use_amcl').value else
+             'Attente de Nav2 (bt_navigator + waypoint_follower)...')
+    try:
+        nav2_ok = wait_nav2_active(nav)
+    except Nav2Timeout as err:
+        log.error(f'Nav2 non actif après {nav.get_parameter("nav2_timeout").value:g} s '
+                  f'(nœud manquant : {err.manquant}) : arrêter le launch et le relancer')
+        return 2
+    if not nav2_ok:
         log.warn('Arrêt demandé pendant l\'attente de Nav2')
         return
 
@@ -204,7 +300,20 @@ def run(nav):
         pause(nav, 2.0)
     log.info('Suivi du balayage démarré')
 
+    # Détecteur de faux succès (Nav2 « atteint » des waypoints sans que le robot bouge)
+    odom = None
+    monitor = None
+    if nav.get_parameter('check_progress').value:
+        odom = OdomDistance(nav)
+        monitor = ProgressMonitor(
+            min_ratio=nav.get_parameter('progress_min_ratio').value,
+            min_expected=nav.get_parameter('progress_min_expected').value,
+            max_suspects=nav.get_parameter('progress_max_suspects').value,
+            max_elapsed=nav.get_parameter('progress_max_elapsed').value)
+    start_xy = (nav.get_parameter('initial_x').value,
+                nav.get_parameter('initial_y').value)
     t_start = nav.get_clock().now()  # temps simulé (use_sim_time)
+    state = {'odom_at_last': 0.0, 'time_at_last': t_start}
     max_duration = nav.get_parameter('max_duration').value
     last_wp = -1
     lost_since = None  # début (temps MONOTONE) de l'indisponibilité du serveur
@@ -220,7 +329,16 @@ def run(nav):
             break
         feedback = nav.getFeedback()
         if feedback is not None and feedback.current_waypoint != last_wp:
-            last_wp = feedback.current_waypoint
+            new_wp = feedback.current_waypoint
+            if monitor is not None and new_wp > max(last_wp, 0):
+                if odom.count == 0:
+                    log.warn('check_progress : aucune /odom reçue, contrôle '
+                             'de progression désactivé', throttle_duration_sec=10.0)
+                elif check_validated(nav, monitor, odom, poses, start_xy,
+                                     last_wp, new_wp, state):
+                    cancel_task(nav)
+                    return 1
+            last_wp = new_wp
             log.info(f'Waypoint {last_wp + 1}/{len(poses)}')
         # La découverte DDS peut vaciller sous WSL : on ne sort qu'après
         # ~3 s d'échecs consécutifs (compteur remis à zéro dès que ça répond).
@@ -283,8 +401,20 @@ def main(args=None):
     nav.declare_parameter('initial_yaw', 0.0)
     # 0.0 = illimité ; sinon durée (s simulées) après laquelle on annule et on quitte
     nav.declare_parameter('max_duration', 0.0)
+    # Localisation : False = Nav2 sans AMCL (map->odom statique), pas de pose initiale à attendre
+    nav.declare_parameter('use_amcl', True)
+    # Délai global (s, temps monotone) d'attente de Nav2 ; sortie code 2 au-delà
+    nav.declare_parameter('nav2_timeout', 120.0)
+    # Détection des faux succès Nav2 (waypoints validés sans déplacement odométrique)
+    nav.declare_parameter('check_progress', True)
+    nav.declare_parameter('progress_min_ratio', 0.3)
+    nav.declare_parameter('progress_min_expected', 0.15)
+    nav.declare_parameter('progress_max_suspects', 2)
+    # Un waypoint n'est suspect que s'il est validé en moins de ce délai (s)
+    nav.declare_parameter('progress_max_elapsed', 2.0)
+    code = 0
     try:
-        run(nav)
+        code = run(nav) or 0
     except (KeyboardInterrupt, ExternalShutdownException):
         # Arrêt demandé (SIGINT) : le contexte rclpy peut déjà être détruit.
         # On n'annule la tâche Nav2 que s'il est encore utilisable
@@ -302,6 +432,8 @@ def main(args=None):
             pass  # contexte déjà détruit
         if rclpy.ok():
             rclpy.shutdown()
+    if code:
+        sys.exit(code)  # code d'erreur : 1 = progression anormale, 2 = Nav2 non actif
 
 
 if __name__ == '__main__':

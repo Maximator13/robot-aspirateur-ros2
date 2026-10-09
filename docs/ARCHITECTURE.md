@@ -129,7 +129,7 @@ flowchart LR
     GZ["gzserver<br/>diff_drive + LiDAR"]
     MS["map_server<br/>(dans Nav2)"]
     PL["coverage_planner"]
-    EX["coverage_executor<br/>BasicNavigator"]
+    EX["coverage_executor<br/>BasicNavigator<br/>+ détecteur de progression"]
     NAV["Nav2<br/>(détail en 2.2)"]
     AMCL["amcl"]
     TR["coverage_tracker<br/>strategy = BOUSTROPHEDON"]
@@ -146,6 +146,7 @@ flowchart LR
     EX -. "service /amcl/get_state<br/>lifecycle_msgs/srv/GetState" .-> AMCL
     EX -. "services /bt_navigator/get_state<br/>et /waypoint_follower/get_state<br/>lifecycle_msgs/srv/GetState" .-> NAV
     GZ -- "/scan<br/>sensor_msgs/LaserScan" --> TR
+    GZ -- "/odom<br/>nav_msgs/msg/Odometry<br/>BEST_EFFORT" --> EX
     NAV -- "/cmd_vel<br/>geometry_msgs/Twist" --> GZ
     TR -- "/coverage_map<br/>nav_msgs/OccupancyGrid" --> RV
     TR -- "/coverage_status<br/>aspi_interfaces/CoverageStatus" --> OUT
@@ -155,7 +156,11 @@ Rôles :
 
 - `coverage_planner` : une publication par carte reçue. Départ de calcul en (0, 0), l'origine de la carte (spawn). Logique dans `planning.py`.
 - `coverage_executor` : un `BasicNavigator` qui enchaîne pose initiale, attente de Nav2, `FollowWaypoints`, suivi. Il s'arrête de lui-même à `max_duration` (= `run_duration` + 10 s).
+- Abonnement à `/odom` (`nav_msgs/msg/Odometry`, QoS capteur) : l'executor cumule la distance odométrique parcourue.
+- Détecteur de progression anormale (`check_progress`, module pur `progress_check`) : à chaque waypoint validé par Nav2, il compare la distance odométrique à la distance attendue (longueur du segment). Un waypoint est suspect si la distance est inférieure à 30 % de l'attendue ET s'il est validé en moins de 2 s. Deux suspects consécutifs : le but est annulé, l'executor sort avec le code 1. Il protège du faux succès de Nav2 (waypoints « atteints » robot immobile).
+- Délai global `nav2_timeout` (120 s, temps monotone) : si Nav2 n'est pas actif à temps, l'executor sort avec le code 2.
 - Attente de Nav2 (traits pointillés du schéma) : l'executor interroge les services `get_state` (`lifecycle_msgs/srv/GetState`) de `amcl`, `bt_navigator` et `waypoint_follower`, chacun avec un délai. Séquence : amcl actif, pose initiale republiée jusqu'à réception de `/amcl_pose`, bt_navigator actif, waypoint_follower actif, serveur d'action `FollowWaypoints` prêt, envoi des waypoints (jusqu'à 5 essais si le but est refusé). Détail dans `ALGORIGRAMMES.md`, section 3.2.
+- Les étapes amcl et pose initiale n'existent que si `use_amcl` est vrai. Avec `use_amcl` faux (mode `localization:=static` du robot réel, section 7), l'executor attend seulement `bt_navigator`, `waypoint_follower` et le serveur d'action.
 - `coverage_tracker` : identique à A, seul `strategy` change.
 - `amcl` est dessiné à part du bloc Nav2 car l'executor dialogue directement avec lui (pose initiale, lecture de `/amcl_pose`).
 - `/scan` va aussi vers AMCL et les costmaps de Nav2 (non dessiné ici, voir 2.2).
@@ -348,7 +353,10 @@ Non encore exécuté sur le robot : section écrite d'après les launch `aspi_re
 
 **Stratégie B (`aspi_real_planned.launch.py`).**
 
-- Nav2 complet (`bringup_launch.py`) avec `nav2_params_real.yaml` (0.10 m/s).
+- Argument `localization` (contrôlé au lancement : seules les valeurs `amcl` et `static` sont acceptées).
+  - `amcl` (défaut) : Nav2 complet (`bringup_launch.py`) avec `nav2_params_real.yaml` (0.10 m/s).
+  - `static` : Nav2 sans AMCL, schéma ci-dessous.
+- L'executor s'abonne à `/odom` (`nav_msgs/msg/Odometry`) pour le détecteur de progression anormale (section 2.1). Il reçoit `use_amcl` = (`localization` vaut `amcl`).
 - Keepout optionnel (`keepout:=true`) :
   - `filter_mask_server` publie `/keepout_filter_mask` (`nav_msgs/msg/OccupancyGrid`) ;
   - `costmap_filter_info_server` publie `/costmap_filter_info` (`nav2_msgs/msg/CostmapFilterInfo`) ;
@@ -380,3 +388,33 @@ flowchart LR
 ```
 
 Dans la stratégie B, la TF `map → odom` vient de l'AMCL de Nav2 ; dans la stratégie A, de `LOC`. Le tracker, commun, lit `/scan` et la TF.
+
+**Stratégie B, mode `localization:=static`** (sans AMCL) :
+
+```mermaid
+flowchart LR
+    L["aspi_real_planned.launch.py<br/>localization:=static"]
+    C["nav2_container<br/>component_container_isolated"]
+    NL["navigation_launch.py<br/>composition dans nav2_container"]
+    MS["map_server"]
+    LM["lifecycle_manager_map"]
+    TF["static_transform_publisher<br/>TF map vers odom<br/>odom_x, odom_y"]
+    EX["coverage_executor<br/>use_amcl = False"]
+    BR["robot<br/>/odom Odometry, /scan"]
+
+    L --> C
+    L --> NL
+    L --> MS
+    L --> LM
+    L --> TF
+    NL -- "charge les nœuds Nav2" --> C
+    LM -- "active" --> MS
+    MS -- "/map<br/>nav_msgs/OccupancyGrid" --> C
+    TF -- "TF map vers odom" --> C
+    BR -- "/odom" --> EX
+    EX -- "action /follow_waypoints<br/>FollowWaypoints" --> C
+```
+
+- Nav2 (sans `amcl` ni `map_server` du bringup) tourne dans un seul conteneur `nav2_container`, comme le bringup complet. Le `map_server` et son `lifecycle_manager_map` sont lancés à part.
+- `map → odom` est une TF statique de décalage (`odom_x`, `odom_y`), à 0 sur le robot réel : l'odométrie est remise à zéro au bringup, robot sur la croix de départ.
+- Ce mode supprime AMCL. Il ne corrige pas un éventuel retard de `odom → base_footprint` (horloge du robot, Wi-Fi).

@@ -525,3 +525,63 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : les runs de la séance sont mesurés avec 634 cellules atteignables. Le calcul donne 634 cellules avec 0,25 contre 620 avec 0,19, soit un écart de 2 %.
 - **Justification** : la zone est fermée par les cartons, donc l'écart reste faible. Il faut tout de même le noter pour l'interprétation des résultats.
 - **Résultat-leçon** : vérifier `free_thresh` à chaque sauvegarde de carte, comme le contrôle de cohérence du premier jour.
+
+### 2026-10-09 · Revue des modifications de la séance robot
+
+- **Contexte** : relecture des modifications faites pendant la séance robot du jour : scripts de vérification et d'arrêt, executor, configuration Nav2, carte `zone_reelle`.
+- **Options envisagées** : non consignées.
+- **Choix** : deux bloquants trouvés et corrigés.
+  - (a) `robot_check.sh` tuait son propre shell distant : `pkill -f motif` s'exécutait dans une commande SSH dont la ligne contenait le motif. Reproduit. Correction : motifs à crochets (`[t]urtlebot3_ros`).
+  - (b) `stop_robot.sh` pouvait bloquer indéfiniment, car `ros2 topic pub` attend un abonné. Correction : publications bornées dans le temps ; le script rend la main en 5,4 s, même sans robot.
+  - Autres modifications :
+    - le `transform_timeout` modifié pendant la séance était placé dans une section ignorée par Humble (`recoveries_server`). Il est déplacé dans la section `behavior_server`.
+    - les tolérances à 1,0 s sont un contournement de l'écart d'horloge, pas une correction.
+    - les valeurs propres au robot n°1 sont rendues surchargeables.
+    - la carte `zone_reelle` est passée à `free_thresh` 0,19.
+- **Justification** : (a) évite un double bringup (incident 2). (b) un script d'arrêt doit rendre la main même sans robot.
+- **Résultat-leçon** : les pièges déjà rencontrés (`pkill -f`) reviennent quand on écrit vite sous pression. La relecture les rattrape ; elle doit précéder chaque commit de script utilisé sur le terrain.
+
+### 2026-10-09 · Phase 0 : débloquer le run B sans robot
+
+- **Contexte** : le run B sur le robot réel reste bloqué (incident 10). Les symptômes sont dominés par le temps : l'horloge du robot a été remise à l'heure en cours de séance, et les mémoires de transformations des nœuds du PC gardent des données « du futur ». Le Wi-Fi joue un rôle secondaire. Hypothèse à vérifier sur place.
+- **Options envisagées** : latence Wi-Fi des TF, charge CPU de WSL, dérive d'horloge (diagnostic principal retenu). Pistes de l'incident 10 : chrony, Nav2 sur le Pi du robot.
+- **Choix** : trois outils avant la prochaine séance.
+  - (a) détecteur de progression anormale dans l'executor (module pur `progress_check`). Un waypoint est suspect si la distance odométrique est inférieure à 30 % de la distance attendue ET s'il est validé en moins de 2 s. Alerte au 2e suspect consécutif : but annulé, code de sortie 1.
+  - (b) mode `localization:=static` pour B : Nav2 sans AMCL, `map → odom` fixe.
+  - (c) script `diag_b.sh` : horloge, âge des messages, fréquences, états Nav2, TF, charge CPU. Option `--sim`.
+- **Justification** : le statut de Nav2 ne prouve pas le mouvement du robot. Le détecteur mesure le mouvement. Le mode static retire AMCL des causes possibles. Le diagnostic rend les hypothèses vérifiables.
+- **Résultat-leçon** : outils livrés, pas encore validés sur le robot. Le diagnostic reste à faire sur place.
+
+### 2026-10-09 · Phase 0 : itérations en simulation
+
+- **Contexte** : premier essai en simulation. Le mode `static` donne 7 à 9 % en 150 s, contre 15,4 % avec AMCL. Le détecteur arrête le run dans 2 essais sur 2.
+- **Options envisagées** : non consignées.
+- **Choix** : l'analyse des logs montre que Nav2 saute les waypoints après un échec (« Failed to process waypoint »), ce qui fait aussi avancer le numéro de waypoint. Corrections :
+  - critère de temps ajouté au détecteur. Un faux succès réel dure 0,85 à 0,90 s par waypoint dans les logs de la séance ; les échecs Nav2 en simulation durent 22 s et plus. Ajouter une condition ne peut que réduire les fausses alertes.
+  - en mode static, Nav2 est chargé dans un seul conteneur. Avec un processus par nœud, la charge CPU est plus élevée et 1 démarrage sur 4 reste bloqué.
+- **Justification** : le numéro de waypoint seul ne suffit pas à juger la progression ; la durée par waypoint sépare un vrai déplacement d'un saut.
+- **Résultat-leçon** : static 14,6 à 14,8 % en 150 s (2 runs), contre 15,4 % avec AMCL. Aucune fausse alerte, démarrage au premier essai. Alarme vérifiée : odométrie immobile, critère de temps désactivé, arrêt au 2e waypoint, code 1. 101 tests passent. Limite : un faux succès instantané comme sur le robot ne se reproduit pas en simulation, Nav2 y valide lentement.
+
+### 2026-10-09 · Incident : démarrage Nav2 bloqué en mode amcl
+
+- **Contexte** : en mode `amcl`, 1 démarrage sur 2 est bloqué. Le conteneur du bringup n'a pas chargé `bt_navigator` (« failed to send response to …/load_node (timeout) »). L'executor attendait indéfiniment.
+- **Options envisagées** : non consignées.
+- **Choix** : délai d'attente de Nav2 ajouté à l'executor (`nav2_timeout`, 120 s). Au dépassement, sortie avec code 2.
+- **Justification** : un processus qui attend sans limite bloque la séance sans message d'erreur exploitable.
+- **Résultat-leçon** : un démarrage bloqué doit échouer avec un code de sortie explicite, pas attendre indéfiniment.
+
+### 2026-10-09 · Incident : port 11345 occupé par Zwift (Gazebo)
+
+- **Contexte** : depuis le passage de WSL en réseau mirrored, Zwift (Windows) occupe le port 11345 de Gazebo. Erreur : « bind: Address already in use ».
+- **Options envisagées** : non consignées.
+- **Choix** : contournement par `GAZEBO_MASTER_URI=http://localhost:11350`.
+- **Justification** : le contournement n'exige pas de fermer Zwift.
+- **Résultat-leçon** : en réseau mirrored, les ports Windows et WSL sont partagés. Vérifier les ports occupés avant de lancer Gazebo.
+
+### 2026-10-09 · Incident : diag_b.sh ne voyait pas la simulation
+
+- **Contexte** : `diag_b.sh` forçait `ROS_LOCALHOST_ONLY=0`, donc il ne voyait pas la simulation. Il lançait aussi trop de commandes `ros2` en parallèle : au-delà d'environ 4, erreur « context is not valid ».
+- **Options envisagées** : non consignées.
+- **Choix** : option `--sim` ajoutée au script. Au plus 3 commandes `ros2` en parallèle.
+- **Justification** : le diagnostic doit utiliser la même configuration réseau ROS que la cible.
+- **Résultat-leçon** : un script de diagnostic respecte la configuration réseau ROS de la cible et limite sa concurrence.

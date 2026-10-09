@@ -17,6 +17,14 @@ Principe de la journée : le robot ne fait tourner que le pilote bas niveau (`ro
 Tout le reste (nos nœuds, Nav2, Cartographer, RViz) tourne sur le PC. Les deux machines se parlent par DDS sur le réseau.
 Donc : réseau, horloge et `ROS_DOMAIN_ID` doivent être corrects avant tout le reste.
 
+**Faits constatés à la séance du 2026-10-09 (robot n°1)** :
+
+- Le robot n°1 est un point d'accès Wi-Fi : réseau « turtlebot1 », IP du robot `10.42.0.1`, utilisateur SSH `turtle`, clé SSH du PC installée.
+- `ROS_DOMAIN_ID=1` (pas 30), ROS 2 Humble, LiDAR **LDS-02**.
+- Le robot n'a pas d'Internet et pas d'horloge sauvegardée : il repart en arrière à chaque extinction (incident 3 du journal).
+- Les valeurs `ROS_DOMAIN_ID=30` et `LDS-01` des sections 2 à 5 ci-dessous sont des exemples : pour le robot n°1, utiliser 1 et LDS-02.
+- Démarrage : toujours par `robot_check.sh` (section 4). Arrêt : section 6. Run B réel non résolu : section 12.
+
 ---
 
 ## 0. Avant de partir (ce soir)
@@ -63,6 +71,8 @@ Si `wsl.exe --version` n'est pas reconnu : la version de WSL est ancienne, voir 
 | Peut-on modifier le Wi-Fi du Raspberry Pi (plan B, hotspot du téléphone) ? | |
 | Peut-on corriger l'heure du robot (`sudo`) ? | |
 | Où poser la zone, combien de temps, combien de batteries ? | |
+
+Réponses connues pour le robot n°1 (séance du 2026-10-09) : IP `10.42.0.1` (point d'accès « turtlebot1 »), utilisateur `turtle`, ROS 2 Humble, LDS-02, `ROS_DOMAIN_ID=1`, pas d'Internet sur le robot, horloge non sauvegardée.
 
 Si le prof ne sait pas pour le multicast ni pour l'isolation : on les teste soi-même (section 2.4).
 Si l'OpenCR n'est pas à jour : ne pas le mettre à jour sans l'accord du prof. Noter l'impasse et passer au plan C.
@@ -168,7 +178,7 @@ Le pare-feu Windows classique (profil réseau « Public ») peut aussi bloquer l
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
-export ROS_DOMAIN_ID=30        # = valeur du robot (réponse du prof, section 1)
+export ROS_DOMAIN_ID=1         # robot n°1 : 1 (30 = valeur de la simulation)
 export ROS_LOCALHOST_ONLY=0    # indispensable : 1 bloque tout le trafic hors du PC
 export TURTLEBOT3_MODEL=burger
 printenv | grep ROS
@@ -176,6 +186,7 @@ printenv | grep ROS
 
 Attendu : `ROS_DOMAIN_ID=<celui du robot>`, `ROS_LOCALHOST_ONLY=0`, `ROS_DISTRO=humble`.
 Si le robot utilise un autre domaine : remplacer 30 par sa valeur **dans les deux machines de la même façon**.
+Piège constaté (incident 1) : un onglet gardait les variables de la simulation, et la téléopération n'avait aucun effet. Vérifier `printenv | grep ROS` dans **chaque** onglet.
 Astuce : écrire ces lignes dans un fichier à part, par exemple `~/jour_robot.env`, et faire `source ~/jour_robot.env` dans chaque terminal. Ne pas l'ajouter au `.bashrc`.
 
 Avant de tester, arrêter tout nœud de simulation encore actif (`ps aux | grep -E "gz|ros"`) : un vieux Gazebo pollue `ros2 topic list`.
@@ -336,17 +347,46 @@ Corriger si l'écart est grand :
 
 Le fuseau horaire n'a pas d'importance (ROS utilise le temps epoch). Seul l'écart compte : comparer `date +%s`.
 
+**Robot n°1 : c'est `robot_check.sh` qui s'en charge** (section 4). Il mesure l'écart par SSH ; au-delà de 300 ms, il demande le mot de passe sudo du robot et le remet à l'heure du PC. Il affiche ensuite « nouvel écart » (retard résiduel : un aller-retour Wi-Fi, 100 à 500 ms). Pour le run B, viser **moins de 100 ms** (section 12).
+
+**Règle absolue : ne jamais remettre le robot à l'heure pendant que des nœuds tournent côté PC.** Voir section 12, étape 0.
+
 ---
 
 ## 4. Lancement du robot
+
+### 4.0 Robot n°1 : procédure de démarrage (la seule à utiliser)
+
+**[WSL]**, onglet normal (le script fixe lui-même `ROS_DOMAIN_ID=1` et `ROS_LOCALHOST_ONLY=0`) :
+
+```bash
+bash ~/ros2_ws/src/aspi_bot/scripts/robot_check.sh
+```
+
+Le script enchaîne :
+
+1. Test de la connexion SSH **par clé** (sans mot de passe). Sinon : `ssh-copy-id turtle@10.42.0.1`, puis relancer.
+2. Mesure de l'écart d'horloge PC-robot. Si l'écart dépasse 300 ms : mot de passe sudo du robot demandé, remise à l'heure, nouvel écart affiché.
+3. Arrêt des anciens lancements sur le robot (évite deux bringups simultanés, incident 2).
+4. Relance propre du bringup (journal sur le robot : `~/bringup.log`). Attente 15 s : calibration du gyroscope, **ne pas bouger le robot**.
+5. Publication de la description du robot **par le PC** (`pc_robot_description.sh`, journal `/tmp/state_publisher.log`) : le `/tf_static` du robot se perd parfois sur le Wi-Fi (incident 7).
+6. Vérification des topics `/cmd_vel`, `/odom`, `/scan`, `/battery_state` et de la TF `base_footprint -> base_scan`.
+
+Attendu : quatre lignes `OK` pour les topics, `OK TF base_footprint -> base_scan`, et « Si tout est OK : ros2 run turtlebot3_teleop teleop_keyboard ».
+Si `MANQUANT` : regarder `~/bringup.log` sur le robot (lignes `Run!`, `ERROR`, `LDS-02 started`), puis relancer le script.
+Si la TF manque : lire `/tmp/state_publisher.log`.
+
+Avant de lancer : **batterie supérieure à 11,3 V**. À 11,03 V (29 %), les moteurs se sont coupés alors que le LiDAR tournait encore (incident 6). `/battery_state` donne la tension : `ros2 topic echo --once /battery_state`.
+
+### 4.1 Lancement manuel (secours, si `robot_check.sh` est inutilisable)
 
 **[Robot]** (SSH ouvert sur le Raspberry Pi) :
 
 ```bash
 source /opt/ros/humble/setup.bash
 export TURTLEBOT3_MODEL=burger
-export LDS_MODEL=LDS-01        # ou LDS-02, selon la réponse du prof
-export ROS_DOMAIN_ID=30        # = valeur de la section 1
+export LDS_MODEL=LDS-02        # robot n°1 : LDS-02 (ou LDS-01 sur un autre robot)
+export ROS_DOMAIN_ID=1         # robot n°1
 export ROS_LOCALHOST_ONLY=0
 printenv | grep -E "ROS|TURTLEBOT|LDS"
 ros2 launch turtlebot3_bringup robot.launch.py
@@ -419,17 +459,18 @@ Si le robot ne bouge pas :
 **Arrêt d'urgence, dans l'ordre :**
 
 1. **Ctrl+C** dans le terminal qui pilote le robot (teleop, launch du run). Les nœuds de ce projet envoient un arrêt à la fin (le `random_walker` publie une vitesse nulle ; l'executor annule le but).
-2. **Toujours**, même si Ctrl+C semble avoir suffi, **[WSL]** (terminal avec les variables ROS de la section 2.4) :
+2. **Toujours**, même si Ctrl+C semble avoir suffi, **[WSL]** :
 
    ```bash
    ~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh
    ```
 
-   Ce script publie 10 vitesses nulles sur `/cmd_vel` (10 Hz). Les scripts ne sont pas installés : le chemin est celui de `src/`.
-   Le script est déjà exécutable (vérifié) ; à défaut : `bash ~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh`.
+   Ce script force lui-même le domaine du robot (1) et `ROS_LOCALHOST_ONLY=0`. Il publie 10 vitesses nulles sur `/cmd_vel` (10 Hz) par **deux voies** : d'abord depuis le PC (en arrière-plan), puis **directement sur le robot via SSH**. Chaque voie est bornée dans le temps (5 s et 10 s) : le script ne bloque jamais. Si le SSH est impossible, il l'écrit et n'arrête que depuis le PC.
+   Attendu : « stop_robot : commandes d'arrêt envoyées (ou expirées) ».
+   Ne sert **pas** en simulation. Les scripts ne sont pas installés : le chemin est celui de `src/` (à défaut d'être exécutable : `bash ~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh`).
 3. **Vérifier que le robot est immobile** (regarder le robot ; `ros2 topic echo --once /odom` deux fois, la position ne change plus).
 4. Si le robot continue à rouler : **le soulever**, puis **couper l'alimentation** (interrupteur de l'OpenCR). Ne pas se fier au logiciel.
-5. Le TurtleBot3 **garde la dernière consigne de vitesse** reçue. Ne **jamais** tuer un nœud avec `kill -9` (ni fermer brutalement le terminal) pendant que le robot roule : plus personne n'envoie l'arrêt.
+5. Le TurtleBot3 **garde la dernière consigne de vitesse** reçue. Après la fin d'un run A, le `random_walker` publie une **vitesse nulle à 10 Hz** et **écrase toute téléopération** : le robot semble refuser de bouger. Faire **Ctrl+C** sur le launch avant de reprendre la main au clavier. Ne **jamais** tuer un nœud avec `kill -9` (ni fermer brutalement le terminal) pendant que le robot roule : plus personne n'envoie l'arrêt.
 6. Test préalable obligatoire : lancer la téléop, faire avancer le robot, puis tester le script d'arrêt **une fois** pour s'assurer qu'il fonctionne avant tout run autonome.
 
 **Limites de sécurité (à connaître avant tout run autonome) :**
@@ -554,15 +595,18 @@ Durée **courte** : **3 à 5 minutes** par run (contre 10 min en simulation). No
 
 **Avant chaque run (liste de contrôle) :**
 
-- [ ] Batterie suffisante (changer si besoin ; une batterie faible fausse la vitesse).
+- [ ] Batterie **supérieure à 11,3 V** (`ros2 topic echo --once /battery_state`). À 11,03 V les moteurs se coupent alors que le LiDAR tourne : le run est alors invalide (incident 6).
+- [ ] `robot_check.sh` passé avec succès (section 4.0), onglets avec `ROS_DOMAIN_ID=1`.
 - [ ] Robot **replacé sur la croix**, **même orientation**, à chaque run. Sinon `map → odom` est faux et la mesure aussi.
 - [ ] `ros2 topic hz /scan` et `/odom` corrects.
 - [ ] Zone dégagée, murs en place, personne dans la zone.
 - [ ] Une personne prête à soulever le robot ; une main sur le clavier (terminal du run, Ctrl+C prêt).
 - [ ] Horloges alignées (section 3).
 - [ ] Vitesses par défaut : 0,10 m/s d'avance (A : `forward_speed`, B : `desired_linear_vel`), 0,6 rad/s de rotation.
-- [ ] Éventuellement lancer l'enregistrement rosbag (traçabilité), dans un terminal à part avant le launch, nom de dossier différent à chaque run (il ne doit pas exister) :
+- [ ] **Enregistrer un rosbag à CHAQUE run** (obligatoire), dans un terminal à part avant le launch, nom de dossier différent à chaque run (il ne doit pas exister) :
   `ros2 bag record -o ~/ros2_ws/results/robot_reel/bag_A_seed1 /coverage_status /odom /tf` (arrêt par Ctrl+C après le run).
+  Raison : sans rosbag, le run « complet » de la séance (RANDOM_2, 72,1 %) n'a pas pu être expliqué. Sa distance est restée figée à 11,94 m de 146,5 s à 300,5 s, et sa couverture figée aussi, alors que le LiDAR continuait. Il n'est valide que jusqu'à 146,5 s.
+- [ ] Après le run, relire le CSV : la distance doit croître jusqu'à la fin. Sinon, le run n'est pas complet.
 - [ ] Les CSV du robot réel vont dans `~/ros2_ws/results/robot_reel/` (argument `output_dir`) : ils ne se mélangent pas avec ceux de la simulation.
 - [ ] Les durées par défaut sont de 300 s (`run_duration`, argument des deux launch). Un run B à 0,10 m/s couvre peu : en simulation, 12,2 % en 120 s (environ 22 s par waypoint). Des runs de 3 à 5 min donneront une couverture faible : c'est attendu, à noter.
 
@@ -581,7 +625,7 @@ Pour les runs 2 et 3 : `seed:=2`, `seed:=3`. Avec une barrière : ajouter `fence
 
 Attendu : le robot avance doucement, tourne devant les obstacles, le tracker publie `/coverage_status` et écrit un CSV dans `~/ros2_ws/results/robot_reel/`. La carte de couverture se colore dans RViz.
 Suivi : `ros2 topic echo /coverage_status` (type `aspi_interfaces/msg/CoverageStatus`).
-Fin : arrêt automatique à la durée demandée ; sinon Ctrl+C, puis **toujours** `~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh`, puis vérifier que le robot est immobile (section 6).
+Fin : arrêt automatique à la durée demandée (le walker publie alors une vitesse nulle à 10 Hz : Ctrl+C avant toute téléopération, section 6) ; sinon Ctrl+C, puis **toujours** `~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh`, puis vérifier que le robot est immobile (section 6).
 Si le robot ne bouge pas : `/scan` reçu ? `/cmd_vel` publié ? (`ros2 topic echo --once /cmd_vel`). Si le robot tourne sans fin : `/scan` vu comme obstacle partout (LiDAR bouché ou `range_min` mal géré).
 Si la couverture reste à 0 % : TF `map → odom` absente ou fausse. Vérifier `ros2 run tf2_ros tf2_echo map base_footprint`.
 
@@ -601,6 +645,7 @@ Fin : arrêt automatique à `run_duration` (l'executor s'arrête 10 s après) ; 
 
 Attendu : Nav2 s'active (log « Nav2 actif »), le chemin de balayage apparaît dans RViz (`/coverage_path`), le robot suit les lignes.
 En simulation, Nav2 mettait jusqu'à environ 90 s pour devenir actif. Si absent après 90 s : arrêter et relancer (piège connu).
+**État au 2026-10-09 : le run B réel n'a pas abouti** (incident 10). Ne pas le lancer directement : suivre la section 12.
 Si le robot ne démarre pas : la pose initiale d'AMCL est-elle bonne (robot sur la croix) ? Si AMCL est mal calée : utiliser le repli `localization:=static` (TF statique identité ; la dérive d'odométrie devient une limite à noter).
 Si le robot touche un mur : Ctrl+C immédiat, puis `stop_robot.sh`. Noter la cause (carte, `inflation`, localisation).
 
@@ -631,6 +676,158 @@ Ne rien reconstituer de mémoire le soir : noter **au fil de la journée**, dans
 - **Comparaison avec la simulation** : écarts de comportement (patinage, bruit du LiDAR, dérive d'odométrie) et limites (une zone, peu de runs, durée courte). Ne pas conclure plus que ce que les chiffres montrent.
 - **Remise en état** en fin de journée : `.wslconfig` (retour au NAT si besoin), règle de pare-feu Hyper-V (retour à l'état d'origine), configuration Wi-Fi du robot restaurée, variables ROS (le `.bashrc` n'ayant pas été modifié, rien à défaire).
 - Commit git de la carte, des CSV et du journal.
+
+---
+
+## 12. Débloquer le run B (procédure de la prochaine séance)
+
+**Problème (incident 10)** : Nav2 s'active, mais les transformations du robot arrivent trop vieilles (environ 2,4 s de retard sur l'horloge du PC, message `Transform data too old`). Nav2 déclare alors des waypoints atteints sans que le robot bouge : **14 waypoints « réussis » en 12 s, robot immobile**. Aucun run B réel n'est mesurable en l'état.
+
+**Leçon** : le statut de Nav2 ne prouve pas le mouvement. Toujours vérifier l'odométrie.
+
+Les `transform_tolerance` à 1,0 s de `nav2_params_real.yaml` (contrôleur, costmaps) sont un **contournement, pas une correction** : ils masquent un retard de 2,4 s, ils ne le suppriment pas. Avec ces tolérances, `bt_navigator` restait inactif (AMCL et la costmap locale : « timestamp earlier than all the data in the transform cache »).
+
+Chaque étape : où, commande, attendu, si échec. Ne passer à la suivante que si l'étape est réussie.
+
+### Étape 0. Règle : ne jamais remettre le robot à l'heure avec des nœuds actifs côté PC
+
+Si on remet l'horloge du robot à l'heure alors que Nav2, AMCL ou le tracker tournent, leurs mémoires de transformations contiennent des données « du futur » : message `timestamp earlier than all the data in the transform cache`. Elles ne s'en remettent pas.
+
+Règle : **horloge d'abord, nœuds du PC ensuite**. Si on a remis le robot à l'heure en cours de route : **tout arrêter et tout relancer côté PC** (Nav2, tracker, executor, RViz).
+
+### Étape 1. `robot_check.sh` AVANT tout lancement côté PC
+
+**[WSL]**, aucun nœud ROS du projet ne doit tourner :
+
+```bash
+bash ~/ros2_ws/src/aspi_bot/scripts/robot_check.sh
+```
+
+Attendu : ligne « écart PC - robot » **inférieure à 100 ms** (le script ne corrige qu'au-delà de 300 ms ; si l'écart est entre 100 et 300 ms, le relancer ne le change pas : voir étape 6), tous les topics et la TF en `OK`.
+Si l'écart reste supérieur à 100 ms après remise à l'heure : le retard résiduel est celui d'un aller-retour Wi-Fi. Relancer le script (nouvelle remise à l'heure) ; noter les valeurs.
+Si `robot_check.sh` échoue : section 4.0.
+
+### Étape 2. Diagnostic `diag_b.sh` (sans `--sim`)
+
+**[WSL]**, environ 40 s, lecture seule (il ne remet jamais le robot à l'heure) :
+
+```bash
+bash ~/ros2_ws/src/aspi_bot/scripts/diag_b.sh
+```
+
+Lancer de préférence Nav2 avant (étape 3), pour que le script voie l'état de Nav2 ; sans Nav2, l'étape Nav2 est ignorée.
+Il mesure : écart d'horloge (seuil 100 ms), **âge de `/scan` et de `/odom` à l'arrivée sur le PC (seuil 0,3 s)**, fréquences (`/scan` ≈ 5 Hz, `/odom` ≈ 30 Hz), états lifecycle des nœuds Nav2, TF `map -> base_footprint` et `odom -> base_footprint`, charge CPU du PC et du robot (4 coeurs : plus de 3 = surchargé).
+Verdict affiché, à lire ainsi :
+
+| Verdict | Signification | Action |
+|---|---|---|
+| HORLOGE | écart d'horloge supérieur à 100 ms | `robot_check.sh`, puis relancer tous les nœuds du PC |
+| RÉSEAU | robot injoignable, ou topics muets | Wi-Fi, alimentation, bringup, `ROS_DOMAIN_ID=1` |
+| RÉSEAU/CPU | horloges proches, mais âge des messages supérieur à 0,3 s | rapprocher le PC du robot, fermer Gazebo et les applis lourdes |
+| NAV2 | horloge et réseau corrects, Nav2 ou TF pas prêts | relancer Nav2, lire son log, vérifier la pose initiale |
+| OK | tout semble sain | étape 3 |
+
+Lecture : âge à peu près égal à l'écart d'horloge = problème d'horloge ; âge très supérieur = latence Wi-Fi ou CPU.
+Si le verdict n'est pas OK : traiter la cause, puis refaire l'étape 2. Noter chaque écart et âge mesurés (matière de l'impasse, étape 7).
+
+### Étape 3. Nav2 seul, UN objectif à 0,5 m
+
+**[WSL]**, premier terminal : Nav2 avec la carte, **sans** nos nœuds de couverture (ni planner, ni executor, ni tracker). Les fichiers utilisés existent (vérifié), la commande n'a pas encore été essayée sur le robot réel :
+
+```bash
+ros2 launch nav2_bringup bringup_launch.py \
+  map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml \
+  params_file:=$HOME/ros2_ws/install/aspi_bot/share/aspi_bot/config/nav2_params_real.yaml \
+  use_sim_time:=false
+```
+
+Deuxième terminal, **[WSL]** :
+
+```bash
+rviz2 -d /opt/ros/humble/share/nav2_bringup/rviz/nav2_default_view.rviz
+```
+
+Dans RViz : la pose initiale est normalement fixée par la config (`set_initial_pose: true`, pose (0, 0, 0) dans `nav2_params_real.yaml`). Si AMCL n'a pas la pose (robot mal placé sur la carte), utiliser « 2D Pose Estimate » sur la croix. Puis **un seul** « Nav2 Goal » à environ **0,5 m** devant le robot, dans la zone, loin des murs.
+Attendu : le robot **se déplace réellement** d'environ 0,5 m et s'arrête.
+Vérification obligatoire, deux fois à quelques secondes d'écart, **[WSL]** :
+
+```bash
+ros2 topic echo --once /odom --field pose.pose.position
+```
+
+La position doit avoir changé d'environ 0,5 m. Regarder aussi le robot.
+Critère de réussite : le robot bouge réellement (odométrie avant/après), pas seulement le message de Nav2.
+Fin du test : Ctrl+C dans les deux terminaux, puis `bash ~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh`.
+Si Nav2 annonce « objectif atteint » mais que l'odométrie n'a pas bougé : **c'est le défaut de l'incident 10**. Arrêter (Ctrl+C, `stop_robot.sh`), refaire les étapes 1 et 2, puis passer aux étapes 5 à 7.
+Si le robot ne bouge pas et Nav2 n'est pas actif : `diag_b.sh` (étape 2), attendre jusqu'à 120 s.
+
+### Étape 4. Run B court (120 s)
+
+Seulement si l'étape 3 a réussi. Robot sur la croix, même orientation. **[WSL]** :
+
+```bash
+ros2 launch aspi_bot aspi_real_planned.launch.py \
+  map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml run_duration:=120.0
+```
+
+Lancer le rosbag avant (section 9), une main sur Ctrl+C, une personne près du robot.
+Deux garde-fous de l'executor :
+
+- **Détecteur de progression anormale** (`check_progress`, actif par défaut) : si des waypoints sont validés **en moins de 2 s** sans déplacement odométrique correspondant, le run est arrêté. **Code de sortie 1** et message dans le log. C'est exactement le faux succès de l'incident 10.
+- **Délai d'attente de Nav2** (`nav2_timeout`, 120 s) : si Nav2 n'est pas actif au bout de 120 s, l'executor s'arrête avec le **code de sortie 2**. Relancer (arrêt propre avant, `stop_robot.sh`).
+
+Attendu : « Nav2 actif », chemin de balayage dans RViz, robot qui suit les lignes, CSV dans `~/ros2_ws/results/robot_reel/`, distance croissante jusqu'à la fin.
+Après : `stop_robot.sh`, vérifier l'immobilité, relire le CSV (distance en fonction du temps).
+**Limite connue** : un échec Nav2 **rapide** (moins de 2 s, sans recoveries) sur deux waypoints de suite déclencherait aussi l'arrêt (code 1). Peu probable : les waypoints sont dans l'espace libre érodé.
+Si code 1 : l'odométrie ne suit pas les consignes de Nav2. Retour aux étapes 1 et 2 ; essayer l'étape 5.
+Si code 2 : relancer ; si ça se répète, étape 2 puis étape 6.
+
+### Étape 5. Repli si AMCL pose problème : `localization:=static`
+
+Nav2 **sans AMCL** : `map -> odom` est une transformation statique fixe (décalage `odom_x`, `odom_y`, à 0 sur le robot réel, car l'odométrie vaut 0 au lancement sur la croix).
+
+```bash
+ros2 launch aspi_bot aspi_real_planned.launch.py \
+  map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml \
+  localization:=static run_duration:=120.0
+```
+
+Le paramètre `localization` est contrôlé : seules les valeurs `amcl` et `static` sont acceptées, une faute de frappe est refusée au lancement.
+
+**Ne pas téléopérer ni déplacer le robot entre `robot_check.sh` et le launch en mode static.** `odom_x = odom_y = 0` suppose que le robot est sur la croix depuis le bringup. Sinon, relancer `robot_check.sh` (et le bringup, si le robot a bougé).
+
+**Honnêtement** : le mode static supprime AMCL, mais pas un éventuel retard de `odom → base_footprint`. Si la cause est l'horloge du robot, static ne la corrige pas.
+
+Résultat en **simulation** (pas sur le robot réel) : 14,6 à 14,8 % en 150 s avec `static`, contre 15,4 % avec AMCL : même ordre de grandeur.
+**Limite** : la dérive d'odométrie n'est pas corrigée. Sur 2 m x 2 m et 2 à 5 min, la dérive reste probablement faible ; à mesurer, pas à supposer.
+Dans ce mode, l'executor n'attend pas de pose initiale (`use_amcl` faux), et `diag_b.sh` attend 6 nœuds Nav2 actifs au lieu de 7.
+Si ça ne change rien au retard des TF : l'AMCL n'est pas la cause. Étape 6.
+
+### Étape 6. Si les transformations restent rejetées
+
+Deux pistes, par ordre de coût. **À vérifier** : aucune n'a été essayée.
+
+1. **Synchronisation propre de l'horloge avec chrony, le PC servant de serveur de temps.**
+   - Sur le PC : `sudo apt install chrony` (**à lancer par l'étudiant** dans son terminal ; je ne le fais pas).
+   - Sur le robot : installer et configurer chrony comme client du PC. **Demander l'accord du prof avant de configurer le robot.** La configuration exacte (serveur côté PC, autorisation du réseau du robot, client côté robot) est **à vérifier** dans la documentation de chrony.
+   - Intérêt : le robot garde l'écart faible en continu, au lieu d'une remise à l'heure ponctuelle. Limite : cela corrige l'horloge, pas la latence Wi-Fi.
+2. **Nav2 sur le Raspberry Pi du robot** : plus de transformations qui traversent le Wi-Fi pour la navigation. **À vérifier** : charge CPU du Pi (Nav2 y est probablement trop lourd, `diag_b.sh` affiche la charge du robot). Accord du prof nécessaire.
+
+### Étape 7. Si rien ne marche en 1 h : impasse documentée
+
+Ne pas s'acharner (règle du projet). Consigner dans `docs/JOURNAL.md` : écarts d'horloge mesurés (`robot_check.sh`), âges de `/scan`, `/odom` et des TF (`diag_b.sh`), verdicts, essais `localization:=static`, rosbags, pistes non testées (étape 6).
+Conclusion à présenter : **le B réel reste un bonus**. La comparaison officielle A/B est celle de la **simulation**. Le run A réel (valide jusqu'à 146,5 s pour RANDOM_2) sert d'illustration.
+
+---
+
+## 13. Pièges d'environnement
+
+- **Port de Gazebo occupé (WSL en réseau `mirrored`)** : en mode mirrored, WSL partage les ports de Windows. Une application Windows peut occuper le port de Gazebo, **11345** (constaté : Zwift). Gazebo ne démarre pas et affiche `bind: Address already in use`.
+  - Contournement 1 : choisir un autre port **avant** le lancement, dans le terminal de Gazebo : `export GAZEBO_MASTER_URI=http://localhost:11350`.
+  - Contournement 2 : fermer l'application Windows qui occupe le port.
+  - Ce piège concerne la simulation, pas le robot réel.
+- **Diagnostic en simulation** : `bash ~/ros2_ws/src/aspi_bot/scripts/diag_b.sh --sim`. Le mode `--sim` garde l'environnement ROS courant, saute le SSH (horloge, charge du robot) et l'âge des messages (les stamps sont en temps simulé : l'âge n'aurait aucun sens). Il vérifie les fréquences, l'état de Nav2 et les TF.
+- **Deux modes de variables** : en simulation, `ROS_DOMAIN_ID=30` et `ROS_LOCALHOST_ONLY=1` ; sur le robot, `ROS_DOMAIN_ID=1` et `ROS_LOCALHOST_ONLY=0`. Les scripts du robot (`robot_check.sh`, `stop_robot.sh`, `diag_b.sh` sans `--sim`) forcent les valeurs du robot dans leur propre processus.
 
 ---
 
