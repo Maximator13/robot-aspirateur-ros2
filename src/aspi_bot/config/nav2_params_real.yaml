@@ -55,6 +55,8 @@ amcl:
       yaw: 0.0
     sigma_hit: 0.2
     tf_broadcast: true
+    # contournement de l'écart d'horloge PC/robot ; ne corrige pas la cause (synchronisation) ;
+    # à ramener aux valeurs de simulation une fois l'horloge synchronisée
     transform_tolerance: 1.0
     update_min_a: 0.2
     update_min_d: 0.25
@@ -154,7 +156,9 @@ controller_server:
       max_lookahead_dist: 0.6  # aspi (essai T3) : borne haute (idem)
       use_velocity_scaled_lookahead_dist: false  # aspi (essai T3) : visée fixe, plus prévisible à vitesse constante
       lookahead_time: 1.5  # défaut Humble, inactif tant que use_velocity_scaled_lookahead_dist est false
-      transform_tolerance: 0.1  # aspi (essai T3)
+      # contournement de l'écart d'horloge PC/robot ; ne corrige pas la cause (synchronisation) ;
+      # à ramener aux valeurs de simulation une fois l'horloge synchronisée
+      transform_tolerance: 1.0  # aspi (robot réel) : latence Wi-Fi + écart d'horloge PC/robot (0.1 en sim)
       use_interpolation: true  # aspi (essai T3)
       use_rotate_to_heading: true  # aspi (essai T3) : rotation sur place vers le cap du chemin, comme le random_walker
       rotate_to_heading_angular_vel: 0.6  # aspi (robot réel) : rotation réduite par sécurité (1.0 en simulation)
@@ -174,6 +178,9 @@ controller_server_rclcpp_node:
 local_costmap:
   local_costmap:
     ros__parameters:
+      # contournement de l'écart d'horloge PC/robot ; ne corrige pas la cause (synchronisation) ;
+      # à ramener aux valeurs de simulation une fois l'horloge synchronisée
+      transform_tolerance: 1.0  # aspi (robot réel) : latence Wi-Fi (défaut 0.3)
       update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: odom
@@ -239,6 +246,9 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
+      # contournement de l'écart d'horloge PC/robot ; ne corrige pas la cause (synchronisation) ;
+      # à ramener aux valeurs de simulation une fois l'horloge synchronisée
+      transform_tolerance: 1.0  # aspi (robot réel) : latence Wi-Fi (défaut 0.3)
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
@@ -347,12 +357,20 @@ recoveries_server:
       plugin: "nav2_recoveries/Wait"
     global_frame: odom
     robot_base_frame: base_link
-    transform_timeout: 0.1
+    transform_timeout: 0.1  # valeur d'origine ; section sans effet en Humble (voir behavior_server)
     use_sim_time: False  # aspi (robot réel) : horloge système
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4
     rotational_acc_lim: 3.2
+
+# aspi : vraie section Humble (remplace recoveries_server)
+behavior_server:
+  ros__parameters:
+    use_sim_time: False
+    # contournement de l'écart d'horloge PC/robot ; ne corrige pas la cause (synchronisation) ;
+    # à ramener aux valeurs de simulation une fois l'horloge synchronisée
+    transform_tolerance: 1.0
 
 robot_state_publisher:
   ros__parameters:

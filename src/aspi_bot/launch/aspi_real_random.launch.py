@@ -43,9 +43,12 @@ def project_nodes(context):
         'allowed_area', 'near_collision_distance', 'use_rviz', 'output_dir')}
     sim = {'use_sim_time': as_bool(cfg['use_sim_time'])}
 
+    # Le chrono du walker démarre au premier scan, celui du tracker au premier déplacement :
+    # le walker a +5 s pour que le robot roule jusqu'à la fin de la mesure.
     walker_params = {'seed': int(cfg['seed']),
                      'forward_speed': float(cfg['forward_speed']),
-                     'turn_speed': float(cfg['turn_speed'])}
+                     'turn_speed': float(cfg['turn_speed']),
+                     'run_duration': float(cfg['run_duration']) + 5.0}
     fence = as_list(cfg['fence'])
     if fence:  # barrière virtuelle (repère odom) : seulement si un rectangle est donné
         walker_params['fence'] = fence

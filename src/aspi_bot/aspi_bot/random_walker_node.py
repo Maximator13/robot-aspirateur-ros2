@@ -35,6 +35,11 @@ class RandomWalkerNode(Node):
         # Chien de garde : sans scan (ou odom si fence) plus récent, le robot s'arrête (s)
         self.declare_parameter('data_timeout', 0.5)
         self.data_timeout = self.get_parameter('data_timeout').value
+        # Durée du run (s) : au-delà, le robot reste à l'arrêt (Twist nul republié à chaque
+        # tick : le robot réel garde sinon le dernier /cmd_vel). 0 = illimité (simulation).
+        self.declare_parameter('run_duration', 0.0)
+        self.run_duration = self.get_parameter('run_duration').value
+        self.start_s = None
         # Barrière virtuelle (robot réel) : [xmin, ymin, xmax, ymax] en repère odom,
         # [] = désactivée. Type explicite : un tableau vide n'a pas de type déductible.
         self.declare_parameter(
@@ -91,6 +96,13 @@ class RandomWalkerNode(Node):
         if now_s == 0.0:  # pas encore de /clock
             return
         if self.front_distance is None:
+            self.publish(0.0, 0.0)
+            return
+        if self.start_s is None:
+            self.start_s = now_s
+        if self.run_duration > 0.0 and now_s - self.start_s > self.run_duration:
+            self.get_logger().info('fin du run : robot à l\'arrêt (Ctrl+C pour quitter)',
+                                   throttle_duration_sec=10.0)
             self.publish(0.0, 0.0)
             return
         # Chien de garde : distance périmée -> arrêt plutôt qu'avancer à l'aveugle

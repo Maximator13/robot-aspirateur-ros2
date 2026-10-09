@@ -410,3 +410,118 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   - les obstacles sous la portée minimale du LiDAR sont invisibles ;
   - la barrière virtuelle (odom) glisse avec la dérive d'odométrie ;
   - avec la stratégie B, une dernière consigne de Nav2 peut rester appliquée après Ctrl+C, d'où l'arrêt systématique par `stop_robot.sh`.
+
+### 2026-10-09 · Séance robot réel : configuration constatée
+
+- **Contexte** : première séance avec le TurtleBot3 Burger réel. Configuration relevée pendant la séance.
+- **Options envisagées** : non consignées.
+- **Choix** : aucun choix technique ; configuration consignée pour les essais suivants.
+  - Robot n°1, joint en point d'accès Wi-Fi à l'adresse 10.42.0.1, utilisateur SSH `turtle`, clé SSH du PC installée sur le robot.
+  - `ROS_DOMAIN_ID=1`, ROS 2 Humble, LiDAR LDS-02.
+  - PC sous WSL en réseau `mirrored`, pare-feu Hyper-V ouvert en entrée.
+  - Carte `zone_reelle` de 11 h 11.
+- **Justification** : ces valeurs diffèrent de la simulation (domaine 30, pas de SSH). Les noter évite de reproduire les incidents 1 et 2.
+- **Résultat-leçon** : le robot n'a pas d'Internet et pas d'horloge sauvegardée. Il repart au 2 octobre à chaque extinction (voir incident 3).
+
+### 2026-10-09 · Incident 1 : variables de la simulation dans un onglet
+
+- **Contexte** : un onglet de terminal avait gardé `ROS_DOMAIN_ID` et `ROS_LOCALHOST_ONLY` de la simulation. La téléopération n'avait aucun effet sur le robot.
+- **Options envisagées** : non consignées.
+- **Choix** : non consigné (la séance ne détaille pas de correction).
+- **Justification** : le domaine et le mode localhost de la simulation ne correspondent pas à ceux du robot (domaine 1). Les nœuds d'un onglet ne voient donc pas le robot.
+- **Résultat-leçon** : vérifier `ROS_DOMAIN_ID` et `ROS_LOCALHOST_ONLY` dans chaque onglet avant un essai réel.
+
+### 2026-10-09 · Incident 2 : deux bringups simultanés sur le robot
+
+- **Contexte** : deux bringups ont été lancés en même temps sur le robot. Seul `/scan` était visible, sans `/cmd_vel`.
+- **Options envisagées** : non consignées.
+- **Choix** : non consigné (la séance ne détaille pas de correction).
+- **Justification** : deux bringups concurrents se gênent sur le même robot, et la commande ne passe plus.
+- **Résultat-leçon** : un seul bringup actif à la fois. Vérifier les topics attendus (`/cmd_vel`, `/odom`, `/scan`) avant chaque essai.
+
+### 2026-10-09 · Incident 3 : horloge du robot au 2 octobre
+
+- **Contexte** : sans Internet et sans horloge sauvegardée, le robot était à la date du 2 octobre, soit un écart de 7 jours exactement. Les TF étaient rejetées et la mesure figée (run RANDOM_2_20261009-113503, bloqué à 37,5 %).
+- **Options envisagées** : non consignées.
+- **Choix** : remise à l'heure depuis le PC. Le script `robot_check.sh` mesure l'écart et remet l'heure à jour si l'écart dépasse 300 ms.
+- **Justification** : sans Internet, aucune synchronisation automatique. Une horloge décalée rend les transformations inutilisables.
+- **Résultat-leçon** : mesurer l'écart d'horloge avant chaque run, car le robot repart au 2 octobre à chaque extinction.
+
+### 2026-10-09 · Incident 4 : première zone trop étroite
+
+- **Contexte** : la première carte ne couvrait que 0,95 m² (cartons trop serrés). Le run d'essai RANDOM_1_20261009-102808 a donné 79,4 % en 300 s, avec 255 near_collisions.
+- **Options envisagées** : non consignées.
+- **Choix** : run conservé comme essai, à exclure des résultats. Nouvelle carte `zone_reelle` de 634 cellules, soit environ 1,6 m².
+- **Justification** : avec des cartons trop serrés, le LiDAR détecte un obstacle à moins de 0,20 m en permanence, d'où le nombre élevé de near_collisions.
+- **Résultat-leçon** : une zone trop petite fausse les métriques. Contrôler le nombre de cellules atteignables avant chaque série de runs.
+
+### 2026-10-09 · Incident 5 : dernière consigne conservée après Ctrl+C
+
+- **Contexte** : le `random_walker` ne s'arrêtait pas en fin de run. Après Ctrl+C, le TurtleBot3 garde le dernier `/cmd_vel` reçu, et le robot a percuté un mur.
+- **Options envisagées** : non consignées.
+- **Choix** : paramètre `run_duration` dans le walker. Après la durée, un Twist nul est republié à chaque tick. Le script `stop_robot.sh` publie le Twist nul sur le robot via SSH, puis depuis le PC, avec ses propres exports.
+- **Justification** : le robot réel garde la dernière consigne, comme la simulation (voir l'entrée du 2026-10-08 sur la sécurité).
+- **Résultat-leçon** : test isolé du walker (domaine 77) : 0,1 m/s pendant le run, 0 après `run_duration`. Confirmé sur le robot par le message « fin du run : robot à l'arrêt ». Corrigé.
+
+### 2026-10-09 · Incident 6 : batterie trop basse, moteurs coupés
+
+- **Contexte** : à 11,03 V (29 %), les moteurs ont été coupés alors que le LiDAR restait actif. Le robot semblait tourner sans bouger (run seed 2, vers 11 h 19).
+- **Options envisagées** : non consignées.
+- **Choix** : non consigné (la séance ne détaille pas de correction).
+- **Justification** : le LiDAR publie `/scan` normalement, donc le capteur ne signale pas la panne des moteurs.
+- **Résultat-leçon** : contrôler la batterie avant chaque séance (plus de 11,3 V, seuil noté pour la prochaine séance). Un run où le robot ne bouge pas est invalide, même si `/scan` circule.
+
+### 2026-10-09 · Incident 7 : `/tf_static` perdu sur le Wi-Fi
+
+- **Contexte** : `/tf_static` n'arrivait pas au PC de façon fiable sur le Wi-Fi. AMCL affichait « queue is full », sa position était figée et la trace rose de RViz s'était arrêtée.
+- **Options envisagées** : non consignées.
+- **Choix** : publication du `/tf_static` sur le PC, avec `robot_state_publisher` du burger (script `pc_robot_description.sh`, URDF avec `${namespace}` retiré). Corrigé.
+- **Justification** : un message statique publié une seule fois et perdu sur le Wi-Fi n'est pas republié. Le PC fournit le modèle du robot sans dépendre du lien.
+- **Résultat-leçon** : sur un lien instable, ne pas compter sur un topic statique publié une seule fois par le robot. Vérifier l'arbre TF avant un essai de navigation.
+
+### 2026-10-09 · Incident 8 : heure du PC prise trop tôt
+
+- **Contexte** : lors de la remise à l'heure, l'heure du PC était lue avant la saisie du mot de passe sudo. Le robot était donc en retard de plusieurs secondes, et le script redemandait le mot de passe à chaque fois.
+- **Options envisagées** : non consignées.
+- **Choix** : corrigé. Le correctif n'est pas détaillé dans les notes de séance ; le défaut venait de la lecture de l'heure avant la saisie.
+- **Justification** : l'heure envoyée doit correspondre au moment de l'envoi, pas au début du script.
+- **Résultat-leçon** : prendre l'heure au moment de l'envoi de la commande, pas avant une étape interactive.
+
+### 2026-10-09 · Incident 9 : couche « Coverage map » figée dans RViz
+
+- **Contexte** : dans RViz, la couche « Coverage map » ne se rafraîchit pas toujours, alors que `/coverage_status` et le CSV continuent de progresser.
+- **Options envisagées** : piste à vérifier, la durabilité Volatile dans `aspi.rviz`.
+- **Choix** : non résolu.
+- **Justification** : le CSV et `/coverage_status` sont écrits par le tracker, indépendamment de l'affichage.
+- **Résultat-leçon** : ne pas se fier à l'affichage RViz pour juger d'un run. Les mesures font foi (CSV, `/coverage_status`).
+
+### 2026-10-09 · Incident 10 : run B bloqué, non résolu
+
+- **Contexte** : run B (Nav2) sur le robot réel, non résolu.
+  - Tentative 1 (12 h 26) : Nav2 est actif, mais le log affiche `tf_help: Transform data too old`. Les TF du robot sont environ 2,4 s en retard sur l'horloge du PC. RPP et le Behavior Tree déclarent chaque but atteint sans mouvement : 14 waypoints « réussis » en 12 s, robot immobile.
+  - Tentative 2 : tolérances à 1,0 s (`transform_tolerance` pour RPP et les costmaps locale et globale, `transform_timeout` pour le behavior_server). `bt_navigator` reste inactif, car l'activation ne se termine pas. AMCL et la costmap locale signalent « timestamp earlier than all the data in the transform cache ».
+- **Options envisagées** : pistes listées dans la séance, non tranchées.
+  - Écart d'horloge réel (lire la sortie « écart … ms » de `robot_check.sh`).
+  - Latence Wi-Fi des TF.
+  - Charge CPU de WSL.
+  - Synchronisation propre avec chrony, le PC servant de serveur.
+  - Lancer Nav2 sur le Pi du robot.
+- **Choix** : non résolu. Aucun run B réel n'est mesurable en l'état.
+- **Justification** : les deux tentatives montrent que le statut de Nav2 ne prouve pas le mouvement du robot. Le blocage est lié à la synchronisation des horloges et à la latence des TF.
+- **Résultat-leçon** : vérifier le mouvement réel, ne pas se fier au statut de Nav2. Le cœur de la comparaison A/B réelle reste à faire.
+
+### 2026-10-09 · Constat d'analyse : run RANDOM_2 arrêté à 146,5 s
+
+- **Contexte** : le run RANDOM_2_20261009-121427 était présenté comme valide et complet (72,1 % en 300 s). La relecture des CSV par le chef de projet montre que la distance reste figée à 11,94 m de 146,5 s à 300,5 s, et la couverture à 72,1 %. Pendant ce temps, near_collisions continue de croître (50 → 95) : le LiDAR fonctionne toujours.
+- **Options envisagées** : causes possibles, non tranchées faute de rosbag. Arrêt physique (moteurs ou batterie, comme l'incident 6) ou pose figée (TF), comme le run B3 de la simulation.
+- **Choix** : le run n'est valide que jusqu'à 146,5 s. Il ne doit pas être présenté comme complet.
+- **Justification** : la distance et la couverture sont figées, alors que le LiDAR continue d'envoyer des données. Cela exclut un simple arrêt du capteur, mais pas la cause du blocage.
+- **Résultat-leçon** : vérifier la distance parcourue en fonction du temps avant de déclarer un run complet. Enregistrer un rosbag à chaque run réel pour trancher la cause.
+
+### 2026-10-09 · Constat : free_thresh de la carte zone_reelle
+
+- **Contexte** : la carte `zone_reelle.yaml` a été sauvegardée avec `free_thresh` à 0,25. C'est le même piège que le premier run A du 2026-10-08 : les pixels inconnus sont relus comme libres.
+- **Options envisagées** : non consignées.
+- **Choix** : les runs de la séance sont mesurés avec 634 cellules atteignables. Le calcul donne 634 cellules avec 0,25 contre 620 avec 0,19, soit un écart de 2 %.
+- **Justification** : la zone est fermée par les cartons, donc l'écart reste faible. Il faut tout de même le noter pour l'interprétation des résultats.
+- **Résultat-leçon** : vérifier `free_thresh` à chaque sauvegarde de carte, comme le contrôle de cohérence du premier jour.

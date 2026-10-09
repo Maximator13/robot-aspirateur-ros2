@@ -1,0 +1,11 @@
+image: zone_reelle.pgm
+mode: trinary
+resolution: 0.05
+origin: [-2.2, -4.54, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.19
+# free_thresh abaissé de 0.25 à 0.19 : les pixels « inconnus » (gris 205) valent
+# p = (255-205)/255 = 0.196 ; avec 0.25, map_server les relisait comme LIBRES.
+# Avec 0.19, ils sont relus comme inconnus (-1), donc traités comme obstacles par planning.py.
+# Les runs du 2026-10-09 ont été mesurés avec 0.25 (634 cellules) ; à partir de cette correction : 620.

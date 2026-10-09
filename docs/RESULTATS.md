@@ -126,3 +126,58 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 - **Blocages au démarrage de Nav2** : l'executor est resté bloqué au démarrage 2 fois sur 5 lancements avant correctif (journal). Le correctif est validé seulement par les runs officiels.
 - **Facteur temps réel** (temps simulé / temps mural), mesuré sur les runs officiels : B1 0.91, B2 0.84, B3 0.94 (temps réel, donc inférieur à 1) ; A en mode accéléré ×2.84, ×3.06, ×3.08 (seeds 1, 2, 3). Un facteur inférieur à 1 en B peut jouer sur les cadences de Nav2.
 - **Seeds de B** : le trajet planifié est le même d'un run à l'autre. Les différences entre runs de B viennent des aléas d'exécution (Nav2, AMCL, machine), pas d'un tirage aléatoire comme en A.
+
+## 7. Robot réel (séance du 2026-10-09)
+
+Cette section est indépendante des sections 1 à 6 (simulation). Tous les chiffres viennent des CSV de `results/robot_reel/`. Les « % à t s » sont interpolés linéairement entre deux points CSV, comme en section 2. La figure et ces valeurs sont reproductibles avec `scripts/plot_robot_reel.py`.
+
+### 7.1 Conditions
+
+- **Robot** : TurtleBot3 Burger réel, LiDAR LDS-02.
+- **Zone** : un enclos en carton, carte `zone_reelle`. Le masque d'espace atteignable compte **634 cellules, soit environ 1,6 m²**, avec le seuil de carte utilisé pendant les runs. Avec le seuil corrigé (0.19, voir journal), il compte 620 cellules : un écart de 2 %, signalé en limites.
+- **Vitesse d'avance** : 0.10 m/s (0.15 m/s en simulation).
+- **Seuil de near_collision** : 0.20 m (valeur supérieure à la portée minimale du LDS-02).
+- **Durée prévue** : 300 s par run.
+- **Localisation pour la mesure** : AMCL sur la carte `zone_reelle`. Le même `coverage_tracker` que pour la simulation.
+- **Stratégie testée** : A (aléatoire) seulement. La stratégie B est restée bloquée sur le robot réel (Nav2 inactif, voir journal) : aucun run B réel.
+
+### 7.2 Tableau de tous les runs
+
+| CSV (RANDOM_seed_horodatage) | Durée mesurée | % à 60 s | % à 120 s | % à 146 s (ou fin) | % final | Distance (m) | near_collisions | Statut |
+|---|---|---|---|---|---|---|---|---|
+| 1_20261009-102808 | 300,5 s | 66,9 | 79,4 | 79,4 | 79,4 | 7,06 | 255 | Exclu : première zone de 0,95 m² (cartons trop serrés), autre dénominateur |
+| 1_20261009-111324 | 249,0 s | 47,2 | 68,6 | 70,2 | 82,3 | 17,32 | 17 | Valide, incomplet (arrêt manuel à 249 s) |
+| 2_20261009-113503 | 300,3 s | 37,5 | 37,5 | 37,5 | 37,5 | 4,37 | 23 | Invalide : mesure figée (horloge du robot) |
+| 2_20261009-114326 | 91,9 s | 10,7 | 10,7 (fin à 91,9 s) | 10,7 (fin) | 10,7 | 0,74 | 23 | Invalide : mesure figée (`/tf_static` perdu) |
+| 2_20261009-120622 | 150,9 s | 50,8 | 72,7 | 74,6 (fin) | 74,6 | 12,03 | 33 | Valide, incomplet (arrêt manuel à 151 s) |
+| 2_20261009-121427 | 300,5 s | 49,3 | 69,1 | 72,1 (à 146,5 s) | 72,1 | 11,94 | 95 | Valide jusqu'à 146,5 s seulement (voir ci-dessous) |
+
+Notes de lecture :
+
+- Le run 102808 (sur l'ancienne zone) n'est pas comparable : zone de 0,95 m², 255 near_collisions. Sa couverture se fige à 79,4 % dès 96,5 s et sa distance à 7,06 m dès 135,5 s. Il est exclu des figures et de l'interprétation.
+- Le run 113503 est figé à 37,5 % (distance 4,37 m) depuis 54,3 s ; le run 114326 est figé à 10,7 % depuis 9,9 s. Pour 113503, les near_collisions passent de 5 (à 60 s) à 23 (en fin de run) alors que la distance ne bouge plus : ce ne sont pas des mesures de déplacement.
+- **Run 121427** : sa couverture (72,1 %) et sa distance (11,94 m) sont **figées de 146,5 s à 300,5 s**, alors que near_collisions continue de croître (50 à 146,5 s, 84 à 248,5 s, 95 en fin de run). Plus aucun déplacement n'est mesuré après 146,5 s. La cause (robot arrêté physiquement, ou pose mesurée figée) n'est **pas tranchée** : il n'y a pas de rosbag. On ne retient donc ce run que jusqu'à 146,5 s : 72,1 % pour 11,94 m et 50 near_collisions. Les valeurs « finales » de la ligne (300,5 s, 95) ne doivent pas être lues comme une mesure de 300 s.
+- Le run 111324 est le seul à dépasser 80 % : 80,4 % à 190 s, 82,3 % à 249 s.
+
+### 7.3 Figure
+
+`results/robot_reel/coverage_vs_time_reel.png` : les trois runs valides, chacun étiqueté. Pour le run 121427, la portion après 146,5 s est tracée en pointillés (« déplacement non mesuré »). Pas de moyenne : trois runs incomplets de durées différentes.
+
+![Couverture en fonction du temps, robot réel](../results/robot_reel/coverage_vs_time_reel.png)
+
+### 7.4 Interprétation (prudente)
+
+- Sur cette zone d'environ 1,6 m², les trois runs valides sont à **68,6 à 72,7 % à 120 s** et à **70,2 à 74,6 % à 146 s**. La stratégie aléatoire atteint donc environ 70 % en 2 à 2,5 minutes. Un seul run (111324) dépasse 80 % (à 190 s).
+- Les trois courbes se ressemblent jusqu'à 50 s environ (autour de 47 à 51 % à 60 s). Elles divergent ensuite (par exemple 47,2 %, 50,8 % et 49,3 % à 60 s, puis plateaux à des moments différents). Avec trois runs courts, on ne peut pas chiffrer la variabilité.
+- **Pas de comparaison A/B réelle** : B n'a pas pu être exécutée.
+- **Pas de comparaison directe avec la simulation** : zone environ 9 fois plus petite (1,6 m² contre 13,9 m²), durée différente, vitesse 0.10 m/s au lieu de 0.15 m/s, localisation AMCL au lieu de l'odométrie simulée. Les pourcentages ne sont pas transposables.
+- near_collisions : 17 à 33 sur les runs valides jusqu'à leur fin (50 pour 121427 à 146,5 s), contre 21 à 32 en simulation sur 600 s. Ces valeurs sont plus élevées par unité de temps, ce qui s'explique plausiblement par la zone exiguë et le seuil de 0.20 m, mais la cause n'a pas été isolée par une expérience.
+
+### 7.5 Limites propres au robot réel
+
+- **Peu de runs** : trois runs valides, tous incomplets ; aucun run de 300 s entièrement valide. Deux seeds seulement (1 et 2), la seed 3 n'a pas été jouée.
+- **Pas de rosbag** : le blocage de la mesure du run 121427 ne peut pas être rejoué ni diagnostiqué.
+- **Seuil de carte** : 634 cellules (seuil utilisé) contre 620 (seuil corrigé 0.19), soit 2 % d'écart sur le dénominateur. Les pourcentages sont donnés avec le dénominateur de 634.
+- **Horloge du robot** : sans Internet ni horloge sauvegardée, le robot repart d'une date ancienne à chaque extinction. Les écarts d'horloge ont rejeté des TF et figé deux runs. La remise à l'heure est manuelle.
+- **Une seule zone, un seul robot**. La zone a changé après le premier essai (0,95 m² puis 1,6 m²) : seul le second dispositif est retenu.
+- **Arrêts manuels** : deux runs valides sont interrompus à la main (249 s et 151 s), les durées ne sont pas comparables entre elles.
