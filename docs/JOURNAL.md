@@ -717,3 +717,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : diaporama de 14 slides (titre + 13 du plan), notes d'orateur avec la répartition (binôme : 1, 2, 3, 6, 7, 13, 14 ; Maxime : 4, 5, 8 à 12). Fiche `docs/FICHE_BINOME.md` relue avant commit.
 - **Justification** : le jury interroge chaque membre ; le coéquipier doit pouvoir expliquer méthode, chiffres et limites.
 - **Résultat-leçon** : la marge d'environ 20 cm aux murs était expliquée par « 15,5 cm d'érosion + 8 cm de tolérance ». Le code (`erosion_radius_cells`) arrondit à la cellule supérieure : 0,155 m deviennent 4 cellules de 5 cm, soit 0,20 m. RESULTATS et PLAN_SOUTENANCE sont corrigés. La relecture a aussi montré qu'un run de démo écrit dans `results/` et fausserait les moyennes si l'on relançait `plot_results.py` : la fiche dirige les démos vers `/tmp/demo`. Leçon : relire le code plutôt que le document quand une explication paraît bricolée.
+
+### 2026-10-12 · Diaporama simplifié et schémas de principe
+
+- **Contexte** : le diaporama était trop dense pour être défendu slide par slide ; l'enseignant attend des schémas de principe où les topics relient les nœuds jusqu'au robot.
+- **Options envisagées** : garder un schéma système unique très complet, ou un schéma simple par stratégie.
+- **Choix** : un schéma de principe par stratégie (rectangle = nœud, pilule = topic, flèche = sens des messages), une slide de démo, des emplacements pour les photos et vidéos du robot réel, et moins de chiffres par slide (le détail passe dans les notes d'orateur). 15 slides, aucun code ni chemin de fichier.
+- **Justification** : chaque membre doit pouvoir expliquer chaque élément affiché ; un schéma lisible vaut mieux qu'un schéma exhaustif.
+- **Résultat-leçon** : la fiche du binôme suit la nouvelle numérotation. Leçon : n'afficher que ce qu'on sait expliquer, garder le reste pour les questions.
