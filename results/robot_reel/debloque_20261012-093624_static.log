@@ -1,0 +1,4 @@
+### debloque_b Mon Oct 12 09:36:24 AM CEST 2026 mode=static
+STOP : des nœuds ROS tournent déjà sur le PC. Ferme tous les autres onglets (Ctrl+C), puis relance.
+641 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch nav2_bringup bringup_launch.py map:=/home/maxim
+665 /opt/ros/humble/lib/rclcpp_components/component_container_isolated --ros-args --log-level info -

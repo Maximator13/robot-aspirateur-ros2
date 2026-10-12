@@ -418,3 +418,36 @@ flowchart LR
 - Nav2 (sans `amcl` ni `map_server` du bringup) tourne dans un seul conteneur `nav2_container`, comme le bringup complet. Le `map_server` et son `lifecycle_manager_map` sont lancés à part.
 - `map → odom` est une TF statique de décalage (`odom_x`, `odom_y`), à 0 sur le robot réel : l'odométrie est remise à zéro au bringup, robot sur la croix de départ.
 - Ce mode supprime AMCL. Il ne corrige pas un éventuel retard de `odom → base_footprint` (horloge du robot, Wi-Fi).
+
+### 7.1 Stratégie B sur le robot : `aspi_real_follow.launch.py` (séance du 2026-10-12)
+
+**Pourquoi un suiveur et pas Nav2.** Sur le robot réel, Nav2 n'a jamais fait avancer le robot (journal du 12/10). Avec AMCL, la TF `map → odom` avait 27 s de retard et Nav2 déclarait le but atteint sans mouvement. En mode `static`, il faisait pivoter le robot de 109° à 174° sans avancer (« Failed to make progress »), même après réglage du progress checker et du contrôleur. Le nœud `coverage_follower` exécute donc le trajet sur le robot : il tourne vers le waypoint, puis avance. La planification boustrophédon (`coverage_planner`, `planning.py`) est identique dans les deux cas. **En simulation, B reste exécuté par Nav2** : c'est la comparaison officielle. Sur le robot, planification identique, exécution différente.
+
+```mermaid
+flowchart LR
+    subgraph ROBOT["Robot (Raspberry Pi)"]
+        BR["turtlebot3_bringup<br/>robot.launch.py"]
+    end
+    subgraph PC["PC (WSL) : aspi_real_follow.launch.py"]
+        MS["map_server<br/>+ lifecycle_manager_map"]
+        ST["static_transform_publisher<br/>TF statique map→odom"]
+        PL["coverage_planner"]
+        FO["coverage_follower"]
+        TR["coverage_tracker"]
+        RV["rviz2"]
+    end
+    MS -->|"/map<br/>nav_msgs/msg/OccupancyGrid"| PL
+    MS -->|"/map"| TR
+    PL -->|"/coverage_path<br/>nav_msgs/msg/Path"| FO
+    BR -->|"/scan<br/>sensor_msgs/msg/LaserScan<br/>(best effort)"| FO
+    BR -->|"/scan"| TR
+    BR -->|"TF odom→base_footprint"| FO
+    ST -->|"TF map→odom"| FO
+    FO -->|"/cmd_vel<br/>geometry_msgs/msg/Twist"| BR
+    TR -->|"/coverage_status, /coverage_map"| RV
+```
+
+- Entrées du `coverage_follower` : `/coverage_path` (`nav_msgs/msg/Path`, durabilité TRANSIENT_LOCAL), `/scan` (`sensor_msgs/msg/LaserScan`, best effort) et la TF `map → base_footprint` (composée de `map → odom` statique et `odom → base_footprint` du robot). Sortie : `/cmd_vel` (`geometry_msgs/msg/Twist`).
+- Localisation : `map_server` plus TF statique identité `map → odom` (`odom_x`, `odom_y` à 0 sur le robot). Odométrie seule, sans AMCL ni recalage LiDAR. Limites : journal et `RESULTATS.md` 7.6.
+- Le `coverage_tracker` est inchangé : même mesure que pour A et pour B simulé. Il publie `/coverage_status` (`aspi_interfaces/msg/CoverageStatus`) et `/coverage_map` (`nav_msgs/msg/OccupancyGrid`).
+- Sécurité du suiveur : arrêt si aucun `/scan` n'a été reçu, ou si le scan ou la TF a plus de `data_timeout` (1,0 s) ; pause si un obstacle est à moins de `stop_distance` (0,15 m) dans le secteur avant ±`front_angle_deg` (30°).

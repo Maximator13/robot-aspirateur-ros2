@@ -585,3 +585,68 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : option `--sim` ajoutée au script. Au plus 3 commandes `ros2` en parallèle.
 - **Justification** : le diagnostic doit utiliser la même configuration réseau ROS que la cible.
 - **Résultat-leçon** : un script de diagnostic respecte la configuration réseau ROS de la cible et limite sa concurrence.
+
+### 2026-10-12 · Impasse : Nav2 sur le robot réel (procédure de déblocage)
+
+- **Contexte** : pendant la séance, la stratégie B lancée par Nav2 sur le robot réel ne produisait aucun déplacement mesurable. La procédure `JOUR_ROBOT.md` section 12 a été automatisée par `scripts/debloque_b.sh` (journaux dans `results/robot_reel/debloque_*`), avec le contrôle de mouvement `scripts/goal_test.py`.
+- **Options envisagées** : non consignées.
+- **Choix** : diagnostic point par point, un facteur à la fois, avec journalisation de chaque essai.
+  1. Horloge : écart ramené de 462 ms à 30-60 ms par une correction relative calculée par le robot dans `robot_check.sh`.
+  2. Réseau : âge de `/scan` et `/odom` d'environ 0,26 s ; Nav2 actif (7/7 nœuds).
+  3. AMCL : `Transform data too old when converting from map to odom`, avec une transformée map → odom vieille de 27 s. Nav2 déclare le but atteint sans que le robot bouge : faux succès, détecté par la mesure du déplacement réel sur `/odom` (`goal_test.py`).
+  4. Mode `static` : Nav2 fait pivoter le robot de 109° à 174° sans jamais avancer, avec `Failed to make progress`. Le progress checker est passé à 0,2 m en 30 s, puis le contrôleur RPP a été testé sans détection de collision : même résultat. Cause non trouvée.
+  5. Un lancement du suiveur a échoué une fois : `map_server: failed to send response to /map_server/change_state (timeout)`, soit un service DDS perdu de façon intermittente. Relancer a suffi.
+- **Justification** : le statut de Nav2 ne prouve pas le mouvement du robot. Seule la mesure sur `/odom` le démontre.
+- **Résultat-leçon** :
+  - Le statut d'un logiciel ne prouve pas le mouvement : mesurer le déplacement réel.
+  - La navigation à travers le Wi-Fi (horloges, latences, services DDS) est un problème en soi, distinct de l'algorithme.
+  - Simplifier l'exécutant a débloqué la situation (voir l'entrée suivante).
+
+### 2026-10-12 · Décision : exécutant simplifié `coverage_follower` pour B sur le robot réel
+
+- **Contexte** : après l'impasse Nav2 sur le robot réel (entrée précédente), la stratégie B devait tout de même être mesurée sur le robot.
+- **Options envisagées** : non consignées.
+- **Choix** : sur le robot réel, B utilise la même planification boustrophédon que la simulation (`coverage_planner`, module `planning.py`), mais l'exécutant `coverage_follower` remplace Nav2. Principe : tourner puis avancer vers chaque waypoint ; pose lue par TF `map → base_footprint` ; pause si un obstacle est à moins de 0,15 m devant ; waypoint sauté après 40 s sans atteinte. Fichiers : `aspi_bot/follow_logic.py`, `aspi_bot/coverage_follower_node.py`, `launch/aspi_real_follow.launch.py`, `test/test_follow_logic.py`. En simulation, B reste exécuté par Nav2 : c'est la comparaison officielle.
+- **Justification** : l'impasse Nav2 sur le robot réel. Un exécutant plus simple, dont chaque action est vérifiable, a débloqué la situation.
+- **Résultat-leçon** :
+  - Résultat : 2 runs B complets sur le robot réel.
+  - Présentation honnête : la planification est identique à la simulation, l'exécution ne l'est pas. La comparaison sur robot réel n'oppose donc pas les mêmes exécutants que la comparaison en simulation.
+  - Leçon : quand une pile logicielle lourde bloque, un exécutant plus simple, dont le comportement se mesure, peut suffire à produire une donnée.
+
+### 2026-10-12 · Résultats réels : stratégie A contre stratégie B sur le robot
+
+- **Contexte** : mesures réelles du 12/10 dans `results/robot_reel/`, avec `localization:=static`, la même carte `zone_reelle` (620 cellules atteignables) et la même croix de départ pour A et B.
+- **Options envisagées** : non consignées.
+- **Choix** : résultats retenus tels quels ; les runs A du 9/10 (avec AMCL) restent des données d'illustration, non mélangées à ceux-ci. Décision de l'étudiant : robot réel terminé, données conservées telles quelles.
+  - A seed 1 (`RANDOM_1_20261012-105211`) : 5,2 % à 30 s, 27,9 % à 60 s, 36,1 % à 120 s, 73,1 % à 300 s. Distance 19,7 m, 21 near_collisions.
+  - A seed 3 (`RANDOM_3_20261012-105805`) : 2,6 % à 30 s, 23,2 % à 60 s, 30,3 % à 120 s, 74,8 % à 300 s. Distance 20,9 m, 19 near_collisions.
+  - B n°1 (`BOUSTROPHEDON_1_20261012-103146`) : 24,4 % à 30 s, 42,7 % à 60 s, 79,4 % à 120 s, 98,4 % à 300 s ; trajet fini vers 147 s. Distance 9,8 m, 8 near_collisions.
+  - B n°2 (`BOUSTROPHEDON_2_20261012-110402`) : 11,9 % à 30 s, 29,7 % à 60 s, 74,5 % à 120 s, 96,5 % à 170 s ; trajet fini vers 157 s, puis arrêt manuel. Distance 9,8 m, 2 near_collisions. Couverture figée après la fin du trajet.
+- **Justification** : mesure dans les mêmes conditions pour A et B. Les courbes réelles se traduisent par un tableau et une courbe `couverture vs temps` (`scripts/plot_results.py` sur `results/robot_reel/`), en signalant que les runs B s'arrêtent avant 300 s.
+- **Résultat-leçon** :
+  - À 120 s, B atteint environ 75-79 % contre environ 30-36 % pour A.
+  - B parcourt deux fois moins de distance et provoque moins de near_collisions.
+  - Ces chiffres sont approximatifs : la localisation par odométrie seule dérive (voir l'entrée « Limites »). Deux runs par stratégie ne permettent aucune conclusion statistique.
+
+### 2026-10-12 · Incident : run B de 10 h 45 arrêté à 161 s
+
+- **Contexte** : run `BOUSTROPHEDON_2_20261012-104557`, arrêté à 161 s. Couverture à 46,8 %, distance 4,6 m, 6 near_collisions. Les waypoints 6 et 7 ont été sautés après 40 s chacun.
+- **Options envisagées** : non consignées.
+- **Choix** : le run est conservé dans `results/robot_reel/` avec le statut « incident », sans être substitué à un autre. Les notes de séance ne donnent pas d'autre décision.
+- **Justification** : cause probable, selon les notes : avec le décalage entre la carte et le réel, un waypoint « libre » sur la carte se trouvait contre un vrai carton. Le suiveur ne pouvait donc pas l'atteindre.
+- **Résultat-leçon** :
+  - Une cellule libre sur la carte n'est pas forcément libre dans la pièce : un décalage de repère se traduit en blocage.
+  - Le délai de 40 s par waypoint limite la perte de temps, sans la supprimer.
+  - Ce run montre la limite de la localisation sans LiDAR, traitée dans l'entrée suivante.
+
+### 2026-10-12 · Limites de la localisation sans LiDAR (odométrie seule, mode static)
+
+- **Contexte** : en mode `localization:=static`, AMCL est retiré : la transformée map → odom est une identité figée. Les conséquences doivent être présentées au jury.
+- **Options envisagées** : non consignées.
+- **Choix** : limites documentées et expliquées, sans correction dans le code pour cette séance.
+  1. Décalage LiDAR / carte visible dans RViz : les murs ne se superposent pas au fond de carte. La transformée figée suppose que le robot est exactement sur la croix et dans l'orientation de la cartographie. Une erreur de cap de 3° donne environ 5 cm d'écart à 1 m. La dérive d'odométrie s'accumule à chaque rotation sur place (le run A tourne environ 20 fois), donc l'écart grandit pendant le run. AMCL, qui recale le LiDAR sur la carte, a été écarté pendant la séance parce qu'il figeait map → odom avec Nav2. Conséquence : le pourcentage couvert est mesuré dans un repère qui dérive. Les chiffres sont approximatifs, surtout pour A.
+  2. B s'arrête avant les bords. La marge du planner (robot_radius 0,105 m + safety_margin 0,05 m = 15,5 cm) et la tolérance d'arrivée (8 cm) laissent le robot à environ 20 cm des murs. Le pourcentage est calculé sur la même zone atteignable pour A et B : la bande le long des murs n'est comptée ni nettoyée par aucun des deux. Perspective : une passe finale de suivi de mur.
+  3. B se bloque au début : avec le décalage carte/réel, un waypoint « libre » peut se trouver contre un vrai carton. Le suiveur fait alors une pause (obstacle à 0,15 m devant). Lors du run de 10 h 45, deux waypoints inaccessibles ont été sautés après 40 s chacun.
+  4. Peu de runs (2 par stratégie), une seule pièce, vitesse réduite à 0,10 m/s pour la sécurité.
+- **Justification** : ces limites viennent de l'absence de recalage par LiDAR et de l'odométrie seule, pas d'un défaut de l'algorithme de planification.
+- **Résultat-leçon** : sans LiDAR de recalage, le repère du robot dérive et la mesure de couverture s'éloigne de la réalité. Présenter ces limites, plutôt que de les masquer, fait partie de l'évaluation. Perspectives : recalage LiDAR (AMCL ou équivalent) et suivi de mur.

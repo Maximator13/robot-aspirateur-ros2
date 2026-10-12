@@ -1,0 +1,124 @@
+### debloque_b Mon Oct 12 09:55:32 AM CEST 2026 mode=static
+=== 0/4 nettoyage des nœuds ROS restés sur le PC
+aucun nœud ROS ne tourne sur le PC
+=== 1/4 robot_check
+== 0a. Connexion SSH par clé (sans mot de passe)
+== 0b. Heure du robot (pas d'horloge sauvegardée : elle repart en arrière à chaque extinction)
+   écart PC - robot : 50 ms
+== 1. Arrêt des anciens lancements sur le robot
+plus rien ne tourne
+== 2. Relance du robot (journal sur le robot : ~/bringup.log)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+[1] 4577
+   attente 15 s (calibration du gyroscope : ne pas bouger le robot)
+[ld08_driver-2] LDS-02 started successfully 
+[turtlebot3_ros-3] [INFO] [1791791745.122494299] [turtlebot3_node]: Run!
+[turtlebot3_ros-3] [INFO] [1791791745.179930318] [diff_drive_controller]: Run!
+== 2b. Description du robot publiée aussi par le PC (/tf_static perdu sur le Wi-Fi sinon)
+== 3. Ce que voit le PC
+/battery_state
+/cmd_vel
+/imu
+/joint_states
+/magnetic_field
+/odom
+/parameter_events
+/robot_description
+/rosout
+/scan
+/sensor_state
+/tf
+/tf_static
+OK       /cmd_vel
+OK       /odom
+OK       /scan
+OK       /battery_state
+OK       TF base_footprint -> base_scan
+Si tout est OK : ros2 run turtlebot3_teleop teleop_keyboard
+Pour arrêter le robot plus tard : ssh turtle@10.42.0.1 'pkill -f [t]urtlebot3_bringup'
+=== 2/4 Nav2 seul (log : /tmp/nav2_debloque.log)
+   attente 25 s (démarrage de Nav2)
+=== 3/4 diagnostic diag_b
+== 1. Écart d'horloge PC - robot (sans remise à l'heure)
+   OK      écart = 48 ms (< 100 ms)
+== 6. Charge CPU (lecture pendant les mesures)
+   PC/WSL   : load average: 0.84, 0.64, 0.68
+   top - 09:57:05 up  3:55,  1 user,  load average: 0.84, 0.64, 0.68
+   Tasks:  57 total,   3 running,  54 sleeping,   0 stopped,   0 zombie
+   %Cpu(s): 27.0 us,  4.8 sy,  0.0 ni, 63.5 id,  0.0 wa,  0.0 hi,  4.8 si,  0.0 st
+   MiB Mem :   5928.4 total,   4897.9 free,    686.3 used,    344.2 buff/cache
+   MiB Swap:   8192.0 total,   8192.0 free,      0.0 used.   5052.2 avail Mem 
+   
+       PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+      4902 maxime    20   0   37880  24324  11072 R  93.8   0.4   0:00.16 ros2
+      4903 maxime    20   0   37880  24272  11100 R  87.5   0.4   0:00.15 ros2
+      4527 maxime    20   0  670812  47852  29664 S  12.5   0.8   0:06.41 bt_navi+
+      4501 maxime    20   0  718296  38048  27140 S   6.2   0.6   0:04.17 map_ser+
+      4519 maxime    20   0 1029916  42960  27448 S   6.2   0.7   0:05.96 control+
+   Robot    : load average: 0.50, 0.49, 0.52   (4 coeurs sur le Pi : > 3 = surchargé)
+== 2. Âge des messages à l'arrivée sur le PC (ros2 topic delay)
+   OK      /scan : âge moyen = 0.261 s (< 0.3 s)
+   OK      /odom : âge moyen = 0.268 s (< 0.3 s)
+   Lecture : âge ~ écart d'horloge (48 ms) -> problème d'HORLOGE ;
+             âge >> écart d'horloge -> latence réseau/Wi-Fi ou charge CPU.
+== 3. Fréquences (attendues : /scan ~5 Hz, /odom ~30 Hz, /tf plusieurs dizaines de Hz)
+   info    /scan : 9.535 Hz
+   info    /odom : 19.955 Hz
+   info    /tf : 41.614 Hz
+== 4. Nav2 (état lifecycle)
+   OK      /map_server : active [3]
+   absent  /amcl (nœud introuvable ou ne répond pas)
+   OK      /planner_server : active [3]
+   OK      /controller_server : active [3]
+   OK      /bt_navigator : active [3]
+   OK      /waypoint_follower : active [3]
+   OK      /behavior_server : active [3]
+   info    /amcl absent : mode sans AMCL (localization:=static), 6 nœuds actifs attendus.
+== 5. TF (tf2_echo bornés)
+   OK      TF map -> base_footprint : présente, âge ~ 0.52 s
+   OK      TF odom -> base_footprint : présente, âge ~ 0.52 s
+
+== Verdict
+   OK : horloge, réseau et Nav2 semblent sains. Si le robot ne bouge pas, vérifier /cmd_vel et le mouvement réel.
+=== 4/4 test de mouvement (un seul objectif, au centre de la zone)
+   Une personne près du robot, la main prête à le soulever. Entrée pour lancer, Ctrl+C pour annuler.
+[INFO] [1791791851.618288338] [basic_navigator]: Nav2 is ready for use!
+[INFO] [1791791851.620006479] [basic_navigator]: Navigating to goal: -0.5750000000000002 -0.46499999999999986...
+[INFO] [1791791911.675986008] [basic_navigator]: Canceling current task.
+[goal_test] but : (-0.58, -0.46), à 0.74 m de la croix
+[goal_test] attente de Nav2 (pose initiale (0, 0, 0) = la croix)...
+[goal_test] envoi du but : LE ROBOT VA BOUGER
+[goal_test] 60 s écoulées : annulation
+[goal_test] statut Nav2 : TaskResult.UNKNOWN
+[goal_test] déplacement RÉEL mesuré sur /odom : 0.00 m (but à 0.74 m), rotation nette 109°
+[goal_test] position finale : odom (-0.00, 0.00), but (-0.58, -0.46)
+[goal_test] VERDICT : PAS DE MOUVEMENT RÉEL
+
+--- messages clés de Nav2 pendant le test
+[controller_server-1] [ERROR] [1791791881.653743502] [controller_server]: Failed to make progress
+[controller_server-1] [WARN] [1791791881.653946771] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[behavior_server-4] [INFO] [1791791903.270614721] [behavior_server]: Running spin
+[behavior_server-4] [INFO] [1791791903.270924995] [behavior_server]: Turning 1.57 for spin behavior.
+[behavior_server-4] [ERROR] [1791791904.387192905] [transformPoseInTargetFrame]: Extrapolation Error looking up target frame: Lookup would require extrapolation
+[behavior_server-4] [WARN] [1791791904.390281166] [behavior_server]: spin failed
+[behavior_server-4] [WARN] [1791791904.390335609] [behavior_server]: [spin] [ActionServer] Aborting handle.
+RÉSULTAT : le robot n'a PAS bougé (faux succès ou échec de Nav2).
+Suite : impasse documentée (JOUR_ROBOT.md section 12, étapes 6-7).
+Journal complet : /home/maxime/ros2_ws/results/robot_reel/debloque_20261012-095530_static.log
+=== arrêt de Nav2 et du robot
+SSH vers le robot impossible : arrêt depuis le PC seulement
+stop_robot : commandes d'arrêt envoyées (ou expirées)
+arrêt de :
+4494 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch nav2_bringup navigation_launch.py params_file:
+4497 /opt/ros/humble/lib/tf2_ros/static_transform_publisher --frame-id map --child-frame-id odom
+4501 /opt/ros/humble/lib/nav2_map_server/map_server --ros-args -p yaml_filename:=/home/maxime/ros2_w
+4519 /opt/ros/humble/lib/nav2_controller/controller_server --ros-args --log-level info --ros-args --
+4521 /opt/ros/humble/lib/nav2_smoother/smoother_server --ros-args --log-level info --ros-args -r __n
+4523 /opt/ros/humble/lib/nav2_planner/planner_server --ros-args --log-level info --ros-args -r __nod
+4525 /opt/ros/humble/lib/nav2_behaviors/behavior_server --ros-args --log-level info --ros-args -r __
+4527 /opt/ros/humble/lib/nav2_bt_navigator/bt_navigator --ros-args --log-level info --ros-args -r __
+4529 /opt/ros/humble/lib/nav2_waypoint_follower/waypoint_follower --ros-args --log-level info --ros-
+4531 /opt/ros/humble/lib/nav2_velocity_smoother/velocity_smoother --ros-args --log-level info --ros-
+4533 /opt/ros/humble/lib/nav2_lifecycle_manager/lifecycle_manager --ros-args --log-level info --ros-
+tous les nœuds ROS du PC sont arrêtés

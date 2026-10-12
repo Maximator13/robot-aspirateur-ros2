@@ -129,7 +129,7 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 
 ## 7. Robot réel (séance du 2026-10-09)
 
-Cette section est indépendante des sections 1 à 6 (simulation). Tous les chiffres viennent des CSV de `results/robot_reel/`. Les « % à t s » sont interpolés linéairement entre deux points CSV, comme en section 2. La figure et ces valeurs sont reproductibles avec `scripts/plot_robot_reel.py`.
+Cette section est indépendante des sections 1 à 6 (simulation). Tous les chiffres viennent des CSV de `results/robot_reel/`. Les « % à t s » sont interpolés linéairement entre deux points CSV, comme en section 2. La figure et ces valeurs sont reproductibles avec `scripts/plot_robot_reel.py`. Cette séance, avec AMCL et sans run B, reste une illustration : ses données ne sont pas mélangées à celles de la séance du 2026-10-12 (sous-section 7.6).
 
 ### 7.1 Conditions
 
@@ -181,3 +181,50 @@ Notes de lecture :
 - **Horloge du robot** : sans Internet ni horloge sauvegardée, le robot repart d'une date ancienne à chaque extinction. Les écarts d'horloge ont rejeté des TF et figé deux runs. La remise à l'heure est manuelle.
 - **Une seule zone, un seul robot**. La zone a changé après le premier essai (0,95 m² puis 1,6 m²) : seul le second dispositif est retenu.
 - **Arrêts manuels** : deux runs valides sont interrompus à la main (249 s et 151 s), les durées ne sont pas comparables entre elles.
+
+### 7.6 Séance du 2026-10-12 : comparaison A/B réelle
+
+Cette sous-section est indépendante des sous-sections 7.1 à 7.5 (séance du 9/10, avec AMCL) et de la simulation. Tous les chiffres viennent des 5 CSV `results/robot_reel/*_20261012-*.csv` ; les « % à t s » sont interpolés linéairement entre deux points CSV. Figure et tableau sont reproductibles avec `scripts/plot_reel_12oct.py`.
+
+**Conditions**
+
+- Robot réel TurtleBot3 Burger, LiDAR LDS-02. Zone en carton, carte `zone_reelle` avec `free_thresh` 0.19 : **620 cellules atteignables** (nombre recalculé avec `planning.py` sur `maps/zone_reelle.yaml`, départ en (0, 0)), soit environ 1,6 m². Même zone et même croix de départ pour A et B.
+- Localisation `localization:=static` : `map -> odom` fixe (identité), pose par odométrie seule, sans recalage LiDAR (pas d'AMCL).
+- Vitesse 0.10 m/s. Durée prévue : 300 s.
+- Le `coverage_tracker` est le même pour A et B.
+- **Différence avec la simulation, à lire avant les chiffres** : sur le robot réel, B n'est **pas exécuté par Nav2** mais par un exécutant simplifié, `coverage_follower` (tourner vers le waypoint puis avancer ; pause si obstacle à moins de 0,15 m devant ; waypoint sauté après 40 s). Nav2 n'a pas pu être rendu opérationnel sur le robot réel (impasse documentée dans le journal). La **planification** est la même qu'en simulation (boustrophédon de `planning.py`). En simulation, B est exécuté par Nav2 : la comparaison officielle reste celle des sections 1 à 6.
+
+**Tableau des 5 runs**
+
+| Run | % à 30 s | % à 60 s | % à 120 s | % final (à) | Temps pour 80 % | Distance (m) | near_collisions | Statut |
+|---|---|---|---|---|---|---|---|---|
+| A seed 1 (10 h 52) | 5,6 | 27,9 | 36,2 | 73,1 % (301 s) | non atteint | 19,7 | 21 | Valide |
+| A seed 3 (10 h 58) | 2,6 | 23,4 | 30,3 | 74,8 % (300 s) | non atteint | 20,9 | 19 | Valide |
+| B n°1 (10 h 31) | 24,4 | 42,7 | 79,3 | 98,4 % (301 s) | 125 s | 9,8 | 8 | Valide. La couverture ne progresse plus après 147 s |
+| B n°2 (11 h 04) | 11,9 | 30,3 | 75,2 | 96,5 % (170 s) | 134 s | 9,8 | 2 | Valide, mais arrêt manuel à 170 s. Couverture et distance figées dès 153 s (trajet fini) |
+| B (10 h 45) | 25,4 | 41,9 | 46,8 | 46,8 % (161 s) | non atteint | 4,6 | 6 | **Incident**, exclu : waypoints 6 et 7 sautés (40 s chacun), arrêté à 161 s. Couverture figée dès 78 s |
+
+Notes de lecture :
+
+- Pour B n°1, la distance continue de croître (9,8 m atteints à 212 s) alors que la couverture ne bouge plus après 147 s ; cette fin de run n'a pas été analysée.
+- Pour A, la couverture progresse encore à la fin des 300 s (dernière hausse à 288 s et 298 s) : les valeurs finales ne sont pas un plafond.
+
+**Figure**
+
+`results/robot_reel/coverage_vs_time_reel_12oct.png` : A (seeds 1 et 3) et les deux runs B valides. Après la fin du trajet, chaque run B est prolongé par sa dernière valeur jusqu'à 300 s **en pointillés** : cette partie n'est pas une mesure (B n°2 a été arrêté à 170 s, et la prolongation de B n°1 est faite à partir de 147 s). Le run incident de 10 h 45 est tracé à part, en gris (tirets-points), et exclu de l'interprétation. Pas de moyenne : deux runs par stratégie.
+
+![Couverture en fonction du temps, robot réel, séance du 12/10](../results/robot_reel/coverage_vs_time_reel_12oct.png)
+
+**Interprétation (prudente)**
+
+- À 120 s, B est à 75,2 et 79,3 % contre 30,3 et 36,2 % pour A. B atteint 80 % en 125 et 134 s ; A n'atteint pas 80 % en 300 s (73,1 et 74,8 %).
+- B finit la zone (96,5 et 98,4 %) avec 9,8 m parcourus, contre 19,7 et 20,9 m pour A en 300 s : environ deux fois moins de distance, et moins de near_collisions (8 et 2 contre 21 et 19).
+- Ce sens est cohérent avec ce qu'on attend d'un balayage planifié face à une marche aléatoire. Mais : **2 runs A et 2 runs B seulement**, **une seule zone de 1,6 m²**, avec un exécutant de B différent de celui de la simulation. Aucune variabilité ne peut être chiffrée, et les pourcentages ne sont pas transposables à la simulation (autre zone, autre exécutant, autre localisation).
+- Le run incident montre que B réel n'est pas toujours fiable : 1 run B sur 3 lancés a mal tourné.
+
+**Limites propres à cette séance**
+
+1. **Localisation par odométrie seule (mode static)** : `map -> odom` est figée et suppose le robot exactement sur la croix, dans l'orientation de la cartographie. Une erreur de cap de 3° donne environ 5 cm d'écart à 1 m (calcul géométrique, non mesuré ici). Un décalage entre murs de la carte et murs réels est visible dans RViz. La dérive d'odométrie s'accumule ensuite à chaque rotation sur place (A tourne de nombreuses fois). Le % est donc mesuré dans un repère qui dérive : **chiffres approximatifs, surtout pour A**. AMCL, qui recale le LiDAR sur la carte, a été écarté car il figeait `map -> odom` avec Nav2 (journal).
+2. **B s'arrête à environ 20 cm des murs** : marge du planificateur 15,5 cm (rayon 0,105 m + marge de sécurité 0,05 m) plus tolérance d'arrivée de 8 cm. Le pourcentage est calculé sur la même zone atteignable pour A et B, donc cette bande n'est nettoyée par aucun des deux. Une passe finale de suivi de mur est une perspective, non testée.
+3. **Blocage de début de B** : avec le décalage carte/réel, un waypoint libre sur la carte peut se trouver contre un vrai carton ; le robot se met en pause (obstacle à moins de 0,15 m). C'est ce qui s'est passé au run de 10 h 45 (deux waypoints sautés après 40 s chacun).
+4. **Peu de runs** (2 + 2, plus un incident), **une seule zone**, **vitesse réduite à 0.10 m/s** par sécurité, **durée de run B n°2 écourtée** (arrêt manuel à 170 s).

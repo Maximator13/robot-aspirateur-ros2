@@ -65,6 +65,19 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
 | R-06 | Revue | relecteur | R-01..R-05 | Aucun BLOQUANT | FINI |
 | R-07 | Journal + commit | opérateur / scribe, chef de projet | toutes | Entrée au journal | FINI |
 
+## Séances robot réel (2026-10-09 et 2026-10-12) et clôture
+
+| Id | Description | Responsable | Dépend de | Critère de fini | Statut |
+|---|---|---|---|---|---|
+| S-01 | Séance du 9/10 : carte réelle, runs A avec AMCL, incidents | étudiant + chef de projet | R-07 | Journal + RESULTATS 7.1–7.5 | FINI |
+| S-02 | Phase 0 sans robot : détecteur de progression, mode static, diag_b.sh | ingénieur algorithmes + développeur ROS + ingénieur test | S-01 | Testé en simulation | FINI |
+| S-03 | Séance du 12/10 : impasse Nav2 réel, suiveur coverage_follower, runs A et B (static) | étudiant + chef de projet | S-02 | 2 runs A + 2 runs B valides | FINI |
+| S-04 | Revue du suiveur et des scripts de la séance, corrections de sécurité | relecteur + développeur ROS | S-03 | Aucun BLOQUANT | EN COURS |
+| S-05 | Journal et RESULTATS (comparaison A/B réelle, limites de la localisation par odométrie) | opérateur / scribe + analyste résultats | S-03 | Chiffres recalculés depuis les CSV | FINI |
+| S-06 | Architecture et algorigramme du suiveur | rédacteur technique | S-04 | Fidèle au code | EN COURS |
+| S-07 | Simulation Gazebo avec fenêtres et captures d'écran (A puis B) pour les slides | chef de projet + ingénieur test | S-04 | Captures dans results/figures/ | À FAIRE |
+| S-08 | Plan de soutenance : slides « Robot réel » et « Limites », question « pourquoi pas Nav2 sur le robot ? » | rédacteur technique | S-05, S-07 | PLAN_SOUTENANCE à jour | À FAIRE |
+
 ### Contrats robot réel (fixés par l'architecte)
 
 - **Sécurité** : vitesse d'avance par défaut 0.10 m/s (A : `forward_speed`, B : RPP `desired_linear_vel`), rotation 0.6 rad/s.

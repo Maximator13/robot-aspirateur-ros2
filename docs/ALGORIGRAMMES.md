@@ -266,3 +266,43 @@ flowchart TD
 - La quasi-collision est comptée sur front montant : un passage sous le seuil compte pour un événement.
 - Le seuil est de 0.15 m, car `range_min` du LiDAR (0.12 m) dépasse le rayon du robot (0.105 m).
 - Le temps du run est le temps simulé.
+
+---
+
+## 5. coverage_follower (stratégie B sur le robot réel, sans Nav2)
+
+Timer à 10 Hz. Chaque tick publie une consigne sur `/cmd_vel`.
+
+```mermaid
+flowchart TD
+    T(["Timer 10 Hz"]) --> A{"trajet reçu<br/>et non terminé ?"}
+    A -- "non : attente du trajet<br/>ou trajet fini" --> STOP(["vitesse nulle"])
+    A -- "oui" --> S{"scan reçu<br/>et plus jeune que 1,0 s ?"}
+    S -- "non" --> STOP
+    S -- "oui" --> R{"durée du run dépassée ?"}
+    R -- "oui, fin du run" --> STOP
+    R -- "non" --> P{"pose par TF map vers base_footprint<br/>disponible et plus jeune que 1,0 s ?"}
+    P -- "non" --> STOP
+    P -- "oui" --> D{"plus de 40 s<br/>sur ce waypoint ?"}
+    D -- "oui" --> SK["waypoint sauté"]
+    D -- "non" --> G{"distance au waypoint<br/>inférieure à 0,08 m ?"}
+    G -- "oui, atteint" --> NX["waypoint suivant"]
+    G -- "non" --> H{"écart de cap supérieur au seuil ?<br/>0,35 rad au départ, 0,70 rad si déjà en avance"}
+    H -- "oui" --> ROT["rotation sur place<br/>0,6 rad/s vers le waypoint"]
+    H -- "non" --> AV["avance 0,10 m/s, cap corrigé<br/>réduite sous 20 cm du but, plancher 0,04 m/s"]
+    AV --> O{"obstacle à moins de 0,15 m<br/>devant, secteur ±30° ?"}
+    O -- "oui" --> PAUSE["pause : vitesse linéaire nulle"]
+    O -- "non" --> OUT(["publier la consigne"])
+    ROT --> OUT
+    PAUSE --> OUT
+    SK --> NX
+    NX --> E{"dernier waypoint passé ?"}
+    E -- "oui" --> END(["trajet terminé : vitesse nulle"])
+    E -- "non" --> Z(["vitesse nulle ce tick,<br/>prochain tick : waypoint suivant"])
+```
+
+- Principe : « tourner puis avancer » (même idée que le `random_walker`). La logique de cap est dans `follow_logic.py`, testée sans ROS.
+- Hystérésis : en avance, on ne repasse en rotation que si l'écart dépasse deux fois le seuil (0,70 rad). Cela évite l'alternance rotation/avance due à la latence Wi-Fi.
+- Les arrêts de sécurité (scan ou TF absents ou périmés) publient une vitesse nulle sans faire avancer le trajet. Le délai de 40 s continue de courir pendant ces arrêts.
+- L'obstacle ne met en pause que l'avance : la rotation sur place reste possible.
+- Un waypoint atteint, sauté ou en fin de trajet remet la vitesse à zéro pour ce tick, puis le suivant démarre en rotation.

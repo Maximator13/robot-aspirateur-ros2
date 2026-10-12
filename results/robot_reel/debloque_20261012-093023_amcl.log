@@ -1,0 +1,99 @@
+### debloque_b Mon Oct 12 09:30:23 AM CEST 2026 mode=amcl
+=== 1/4 robot_check
+== 0a. Connexion SSH par clé (sans mot de passe)
+== 0b. Heure du robot (pas d'horloge sauvegardée : elle repart en arrière à chaque extinction)
+   écart PC - robot : 462 ms
+   heure à corriger. Mot de passe sudo du robot : 
+   essai 1 : nouvel écart 64 ms
+== 1. Arrêt des anciens lancements sur le robot
+plus rien ne tourne
+== 2. Relance du robot (journal sur le robot : ~/bringup.log)
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+[1] 3283
+   attente 15 s (calibration du gyroscope : ne pas bouger le robot)
+[ld08_driver-2] LDS-02 started successfully 
+[turtlebot3_ros-3] [INFO] [1791790241.442219825] [turtlebot3_node]: Run!
+[turtlebot3_ros-3] [INFO] [1791790241.489101399] [diff_drive_controller]: Run!
+== 2b. Description du robot publiée aussi par le PC (/tf_static perdu sur le Wi-Fi sinon)
+== 3. Ce que voit le PC
+/battery_state
+/cmd_vel
+/imu
+/joint_states
+/magnetic_field
+/odom
+/parameter_events
+/robot_description
+/rosout
+/scan
+/sensor_state
+/tf
+/tf_static
+OK       /cmd_vel
+OK       /odom
+OK       /scan
+OK       /battery_state
+OK       TF base_footprint -> base_scan
+Si tout est OK : ros2 run turtlebot3_teleop teleop_keyboard
+Pour arrêter le robot plus tard : ssh turtle@10.42.0.1 'pkill -f [t]urtlebot3_bringup'
+=== 2/4 Nav2 seul (log : /tmp/nav2_debloque.log)
+   attente 25 s (démarrage de Nav2)
+=== 3/4 diagnostic diag_b
+== 1. Écart d'horloge PC - robot (sans remise à l'heure)
+   OK      écart = 52 ms (< 100 ms)
+== 6. Charge CPU (lecture pendant les mesures)
+   PC/WSL   : load average: 1.32, 0.45, 0.30
+   top - 09:31:56 up  3:30,  1 user,  load average: 1.32, 0.45, 0.30
+   Tasks:  47 total,   3 running,  44 sleeping,   0 stopped,   0 zombie
+   %Cpu(s): 26.3 us,  6.0 sy,  0.0 ni, 58.6 id,  0.0 wa,  0.0 hi,  9.0 si,  0.0 st
+   MiB Mem :   5928.4 total,   4280.5 free,    597.2 used,   1050.7 buff/cache
+   MiB Swap:   8192.0 total,   8192.0 free,      0.0 used.   5140.2 avail Mem 
+   
+       PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+       973 maxime    20   0   38904  24800  11044 R  93.8   0.4   0:00.16 ros2
+       970 maxime    20   0   37880  24892  11260 R  87.5   0.4   0:00.15 ros2
+       665 maxime    20   0 2900128 105064  47660 S  56.2   1.7   0:22.03 compone+
+       641 maxime    20   0 2089792  74436  30788 S  12.5   1.2   0:03.58 ros2
+       529 maxime    20   0  644404  29504  19720 S   6.2   0.5   0:01.95 robot_s+
+   Robot    : load average: 0.70, 0.56, 0.43   (4 coeurs sur le Pi : > 3 = surchargé)
+== 2. Âge des messages à l'arrivée sur le PC (ros2 topic delay)
+   OK      /scan : âge moyen = 0.273 s (< 0.3 s)
+   OK      /odom : âge moyen = 0.280 s (< 0.3 s)
+   Lecture : âge ~ écart d'horloge (52 ms) -> problème d'HORLOGE ;
+             âge >> écart d'horloge -> latence réseau/Wi-Fi ou charge CPU.
+== 3. Fréquences (attendues : /scan ~5 Hz, /odom ~30 Hz, /tf plusieurs dizaines de Hz)
+   info    /scan : 9.698 Hz
+   info    /odom : 20.246 Hz
+   info    /tf : 45.353 Hz
+== 4. Nav2 (état lifecycle)
+   OK      /map_server : active [3]
+   OK      /amcl : active [3]
+   OK      /planner_server : active [3]
+   OK      /controller_server : active [3]
+   OK      /bt_navigator : active [3]
+   OK      /waypoint_follower : active [3]
+   OK      /behavior_server : active [3]
+== 5. TF (tf2_echo bornés)
+   OK      TF map -> base_footprint : présente, âge ~ 0.28 s
+   OK      TF odom -> base_footprint : présente, âge ~ 0.28 s
+
+== Verdict
+   OK : horloge, réseau et Nav2 semblent sains. Si le robot ne bouge pas, vérifier /cmd_vel et le mouvement réel.
+=== 4/4 test de mouvement (un seul objectif, au centre de la zone)
+   Une personne près du robot, la main prête à le soulever. Entrée pour lancer, Ctrl+C pour annuler.
+[INFO] [1791790341.244243532] [basic_navigator]: Nav2 is ready for use!
+[INFO] [1791790341.246426257] [basic_navigator]: Navigating to goal: -0.5750000000000002 -0.46499999999999986...
+[goal_test] but : (-0.58, -0.46), à 0.74 m de la croix
+[goal_test] attente de Nav2 (pose initiale (0, 0, 0) = la croix)...
+[goal_test] envoi du but : LE ROBOT VA BOUGER
+[goal_test] statut Nav2 : TaskResult.SUCCEEDED
+[goal_test] déplacement RÉEL mesuré sur /odom : 0.00 m (but à 0.74 m)
+[goal_test] FAUX SUCCÈS : Nav2 dit « réussi » mais le robot n'a pas bougé (incident 10)
+[goal_test] VERDICT : PAS DE MOUVEMENT RÉEL
+
+RÉSULTAT : le robot n'a PAS bougé (faux succès ou échec de Nav2).
+Suite : robot sur la croix, puis essaie le repli sans AMCL : bash /home/maxime/ros2_ws/src/aspi_bot/scripts/debloque_b.sh static
+Journal complet : /home/maxime/ros2_ws/results/robot_reel/debloque_20261012-093023_amcl.log
+=== arrêt de Nav2 et du robot
+stop_robot : commandes d'arrêt envoyées (ou expirées)
