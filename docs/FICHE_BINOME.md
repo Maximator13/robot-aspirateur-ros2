@@ -55,6 +55,46 @@ Ce qui est évalué : la démarche d'ingénierie (problème, options, solution, 
 
 ## 3. Le système
 
+### 3.0 ROS 2 en 5 minutes : nœuds, topics, messages (à lire en premier)
+
+**Un nœud** est un petit programme qui tourne tout seul et qui a **une seule responsabilité**. Exemple chez nous : `random_walker` ne fait que décider de la vitesse du robot pour la stratégie A. Un système ROS 2, c'est plusieurs nœuds qui tournent en même temps et qui se parlent.
+
+**Un topic** est un canal de discussion nommé, par exemple `/scan`. Un nœud **publie** des messages sur un topic, d'autres nœuds **s'abonnent** à ce topic et les reçoivent. Celui qui publie ne sait pas qui écoute : on peut ajouter un abonné (RViz, un enregistrement rosbag) sans rien changer au reste. Image simple : une station de radio (le topic). Le nœud qui publie est l'émetteur, les abonnés sont les postes de radio réglés sur cette station.
+
+**Un message** est ce qui circule sur un topic. Il a un **type** fixe qui dit ce qu'il contient : `sensor_msgs/LaserScan` contient les 360 distances mesurées par le LiDAR, `geometry_msgs/Twist` contient une vitesse d'avance et une vitesse de rotation. Nous avons créé **notre propre type** : `aspi_interfaces/CoverageStatus` (pourcentage couvert, distance, temps, obstacles frôlés).
+
+**Une action** est une demande longue avec un suivi : « va à ces points de passage », avec des nouvelles régulières (« j'en suis au point 12 ») et un résultat final. Nav2 en propose une : `FollowWaypoints`. Un topic, lui, envoie des messages sans attendre de réponse.
+
+**La TF** est le système qui dit où se trouve chaque repère par rapport aux autres : `map` (la carte), `odom` (le point de départ de l'odométrie), `base_footprint` (le robot). En enchaînant `map → odom → base_footprint`, on obtient la position du robot sur la carte. `odom → base_footprint` vient des roues ; `map → odom` vient d'AMCL (qui recale avec le LiDAR) ou est fixe quand on n'utilise pas AMCL.
+
+**Un fichier launch** (`xxx.launch.py`) démarre d'un coup tous les nœuds nécessaires avec leurs réglages. Sur les schémas du diaporama, le **cadre en pointillés** entoure ce que lance un fichier launch.
+
+**La QoS** (qualité de service) fixe comment les messages sont livrés. Deux cas comptent chez nous : `/scan` est envoyé en « best effort » (on accepte d'en perdre, on veut le plus récent), donc l'abonné doit utiliser le profil « sensor_data », sinon il ne reçoit rien ; `/map` est envoyée une seule fois et gardée (« transient local ») pour que ceux qui arrivent après la reçoivent quand même.
+
+**Les commandes pour voir tout ça en direct** : `ros2 node list` (les nœuds), `ros2 topic list` (les topics), `ros2 topic echo /coverage_status` (le contenu des messages), `ros2 topic hz /scan` (la fréquence), `rqt_graph` (le dessin nœuds ↔ topics, comme sur les slides).
+
+#### Dans notre projet : qui parle à qui
+
+| Topic | Type de message | Publié par | Écouté par | Ce qu'il contient |
+|---|---|---|---|---|
+| `/scan` | `sensor_msgs/LaserScan` | le LiDAR (Gazebo ou robot réel), environ 5 fois par seconde | `random_walker`, `coverage_tracker`, `coverage_follower`, Nav2, AMCL | Les 360 distances autour du robot |
+| `/cmd_vel` | `geometry_msgs/Twist` | `random_walker` (A), Nav2 (B en simulation), `coverage_follower` (B réel) | les roues (plugin Gazebo ou robot réel) | La vitesse demandée : avance en m/s, rotation en rad/s |
+| `/odom` | `nav_msgs/Odometry` | les roues | Nav2, AMCL, `coverage_executor` | La position estimée avec les roues seulement |
+| `/map` | `nav_msgs/OccupancyGrid` | `map_server` (carte faite avec Cartographer) | `coverage_planner`, `coverage_tracker`, Nav2, RViz | La grille de la pièce : chaque case de 5 cm est libre, occupée ou inconnue |
+| `/coverage_path` | `nav_msgs/Path` | `coverage_planner` | `coverage_executor` (simulation), `coverage_follower` (réel), RViz | Le plan de B : la liste des points de passage (les lignes vertes dans RViz) |
+| `/coverage_status` | `aspi_interfaces/CoverageStatus` (notre type) | `coverage_tracker`, 1 fois par seconde | rosbag, nous | Le % couvert, la distance, le temps, les obstacles frôlés |
+| `/coverage_map` | `nav_msgs/OccupancyGrid` | `coverage_tracker`, 1 fois par seconde | RViz | Les cases déjà couvertes (le rose dans RViz) |
+| action `FollowWaypoints` | `nav2_msgs/action/FollowWaypoints` | demandée par `coverage_executor` | servie par Nav2 | « Suis ces points de passage » (B en simulation) |
+| TF `map → odom` | transformation | AMCL (B simulation) ou fixe (A, robot réel) | tous ceux qui ont besoin de la position sur la carte | Le recalage de l'odométrie sur la carte |
+
+**Nos propres nœuds** (écrits par l'équipe) : `random_walker`, `coverage_planner`, `coverage_executor`, `coverage_follower`, `coverage_tracker`. **Les nœuds fournis par ROS 2** (du cours) : `map_server`, Nav2 (planificateur, contrôleur, suivi de points), AMCL, `robot_state_publisher`, RViz, Gazebo.
+
+**La boucle de A, en une phrase** : le LiDAR publie `/scan` → `random_walker` le lit et décide → il publie `/cmd_vel` → les roues bougent → le LiDAR voit autre chose → et ainsi de suite, 10 fois par seconde.
+
+**La chaîne de B en simulation, en une phrase** : `map_server` publie `/map` → `coverage_planner` calcule le plan et publie `/coverage_path` → `coverage_executor` le transforme en points et appelle l'action `FollowWaypoints` de Nav2 → Nav2 publie `/cmd_vel` → les roues bougent. Sur le robot réel, `coverage_follower` remplace `coverage_executor` et Nav2 : il lit `/coverage_path` et publie lui-même `/cmd_vel`.
+
+**Le juge, pour A et pour B** : `coverage_tracker` lit la position (TF), la carte (`/map`) et le LiDAR (`/scan`), et publie `/coverage_status` et `/coverage_map`.
+
 ### 3.1 Les nœuds
 
 | Nœud | Entrées | Sorties | Rôle |
