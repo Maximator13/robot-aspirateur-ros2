@@ -701,3 +701,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : fichier rangé dans `results/invalides/`, avec les autres essais hors protocole.
 - **Justification** : éviter de mélanger un run de démonstration avec les données du protocole. Les runs du jumeau sont dans `results/jumeau/`.
 - **Résultat-leçon** : séparer dès la création les données de démonstration et d'essai des données de protocole.
+
+### 2026-10-12 · Plan de soutenance final
+
+- **Contexte** : intégrer au plan les résultats réels du 12/10, le jumeau numérique et l'impasse Nav2 sur le robot.
+- **Options envisagées** : ajouter des slides au plan existant (≈ 15 min) ou resserrer pour tenir en 10 min.
+- **Choix** : 13 slides pour 9 min 30, dont « Robot réel », « Impasse Nav2 sur le robot réel », « Jumeau numérique » et « Limites ». Huit questions du jury ajoutées, dont « pourquoi pas Nav2 sur le robot ? ». PERSPECTIVES : P9 (essai réel) marqué réalisé, ajout de P10 (recalage LiDAR) et P11 (suivi de mur).
+- **Justification** : la durée imposée est de 10 min ; les résultats réels sont la meilleure preuve de la démarche.
+- **Résultat-leçon** : la relecture a trouvé 5 erreurs, dont 2 chiffres faux et 2 surestimations (« le suiveur a mieux tenu », « même type de blocage »). Toujours recalculer les chiffres depuis les CSV et formuler un résultat sur 1 run comme une hypothèse.

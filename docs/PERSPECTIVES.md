@@ -11,15 +11,17 @@ Protocole de mesure commun : même monde, même départ, 600 s simulées, même 
 
 | Rang | Incrément | Gain attendu | Effort | Risque |
 |---|---|---|---|---|
-| 1 | P1. Plus de runs (A et B) | Élevé (conclusions solides) | 0,5 jour | Faible |
-| 2 | P2. Réduire les rotations sur place | Moyen à élevé | 0,5 à 1 jour | Faible |
-| 3 | P3. Valeurs demandées et valeurs appliquées (discrétisation) | Moyen (mesure plus honnête) | 0,5 jour | Faible |
-| 4 | P4. Diagnostiquer le gel de `map → odom` | Élevé (fiabilité, mode accéléré) | 1 jour | Moyen |
-| 5 | P5. Coverage server de Nav2 comme référence | Moyen (comparaison) | 1 jour | Moyen |
-| 6 | P6. Spirale ou aléatoire amélioré pour A | Moyen | 0,5 jour | Faible |
-| 7 | P7. Décomposition cellulaire de Choset | Élevé en théorie | 3 jours ou plus | Élevé |
-| 8 | P8. Une autre pièce | Moyen (généralité) | 1 jour | Moyen |
-| 9 | P9. Essai sur robot réel | Élevé (crédibilité) | 2 jours ou plus | Élevé |
+| 1 | P1. Plus de runs (A et B), en simulation et sur le robot réel | Élevé (conclusions solides) | 0,5 jour | Faible |
+| 2 | P10. Recalage LiDAR sur le robot réel (AMCL ou scan matching) | Élevé (mesure réelle plus fiable) | 1 jour | Moyen |
+| 3 | P2. Réduire les rotations sur place | Moyen à élevé | 0,5 à 1 jour | Faible |
+| 4 | P3. Valeurs demandées et valeurs appliquées (discrétisation) | Moyen (mesure plus honnête) | 0,5 jour | Faible |
+| 5 | P4. Diagnostiquer le gel de `map → odom` | Élevé (fiabilité, mode accéléré) | 1 jour | Moyen |
+| 6 | P11. Passe finale de suivi de mur (marge de 20 cm) | Moyen (couverture des bords) | 1 jour | Moyen |
+| 7 | P5. Coverage server de Nav2 comme référence | Moyen (comparaison) | 1 jour | Moyen |
+| 8 | P6. Spirale ou aléatoire amélioré pour A | Moyen | 0,5 jour | Faible |
+| 9 | P8. Une autre pièce | Moyen (généralité) | 1 jour | Moyen |
+| 10 | P7. Décomposition cellulaire de Choset | Élevé en théorie | 3 jours ou plus | Élevé |
+| — | P9. Essai sur robot réel | **Réalisé** (séances des 9 et 12/10, `docs/RESULTATS.md` §7) | — | — |
 
 ---
 
@@ -96,22 +98,31 @@ Protocole de mesure commun : même monde, même départ, 600 s simulées, même 
 - **Effort.** Une journée : cartographier (par `random_walker`, comme pour la première carte), 3 runs par stratégie.
 - **Mesure de succès.** Classement A contre B inchangé, ou écart documenté. Détection des paramètres qui dépendent du monde.
 
-## P9. Essai sur robot réel
+## P9. Essai sur robot réel : réalisé
 
-- **Problème mesuré.** Tout est simulé. L'odométrie simulée est quasi idéale, le LiDAR sans bruit réel, et, pour A, la TF `map → odom` statique supposée exacte (pour B, elle est estimée par AMCL). Aucun chiffre ne dit comment B se comporte sur un vrai robot.
-- **Proposition.** Un essai court du `random_walker` seul (A) sur un TurtleBot3 réel :
-  1. connexion Wi-Fi au Raspberry Pi, même `ROS_DOMAIN_ID` ;
-  2. WSL en mode réseau « mirrored » (à vérifier : sans lui, le multicast DDS risque de ne pas passer) ;
-  3. `ROS_LOCALHOST_ONLY` désactivé pour cet essai ;
-  4. `use_sim_time` à False.
-  Ensuite seulement, essayer B.
-- **Effort.** Deux jours ou plus. Les points durs sont le réseau (multicast, latence) et le recalage de la carte.
-- **Mesure de succès.** Niveau 1 : `/scan` et `/cmd_vel` échangés avec le robot réel, sans perte, depuis WSL. Niveau 2 : A tourne 5 minutes sans collision.
-- **Limite.** Risque matériel et réseau. À ne tenter qu'après P1 et P2.
+- **Statut.** Réalisé les 9 et 12/10 sur un TurtleBot3 Burger réel, dans une zone en carton d'environ 1,6 m². Résultats et limites : `docs/RESULTATS.md` §7.5 à §7.7.
+- **Ce qui a été obtenu.** Comparaison A contre B sur le robot (2 runs A, 2 runs B valides, 1 run B incident exclu). B est exécuté par le suiveur `coverage_follower` : Nav2 n'a pas fait avancer le robot réel (journal du 12/10). Localisation par odométrie seule (mode `static`).
+- **Ce qui reste ouvert.** Peu de runs, pas de rosbag sur les runs réels, localisation sans recalage, marge d'environ 20 cm aux murs. Ces points sont repris par P1, P10 et P11.
+
+## P10. Recalage LiDAR sur le robot réel (AMCL ou scan matching)
+
+- **Problème mesuré.** En mode `static`, `map → odom` est figée : décalage visible entre les murs de la carte et ceux du réel, dérive d'odométrie à chaque rotation sur place (A tourne environ 20 fois dans un run). Les pourcentages réels sont approximatifs, surtout pour A. Un run B (10 h 45) a sauté 2 waypoints contre un vrai carton à cause de ce décalage. AMCL avait été écarté parce que la TF `map → odom` avait 27 s de retard avec Nav2.
+- **Proposition.** Une fois l'horloge du robot corrigée de façon durable, retester AMCL avec le suiveur (sans Nav2), ou un recalage par scan matching. Comparer au mode `static` sur les mêmes runs.
+- **Effort.** Estimé à une journée, pas mesuré. Point dur : horloge et latence Wi-Fi.
+- **Mesure de succès.** Murs de la carte superposés à ceux du LiDAR dans RViz, et âge de la TF `map → odom` sous la seconde pendant tout un run.
+- **Limite.** La cause du retard de 27 s n'est pas établie ; le recalage peut échouer pour la même raison.
+
+## P11. Passe finale de suivi de mur
+
+- **Problème mesuré.** B s'arrête à environ 20 cm des murs (marge du planificateur 15,5 cm plus tolérance d'arrivée de 8 cm). Cette bande n'est nettoyée ni par A ni par B : le pourcentage est calculé sur la même zone atteignable.
+- **Proposition.** Ajouter à la fin du trajet une passe qui longe les murs à distance de sécurité réduite, avec le même tracker. Elle n'a pas été testée.
+- **Effort.** Estimé à une journée, pas mesuré.
+- **Mesure de succès.** Couverture de la bande de bord mesurée avant et après, sans hausse des near_collisions.
+- **Limite.** Une marge plus faible augmente le risque de contact ; à tester d'abord en simulation (jumeau).
 
 ---
 
 ## Ce qui n'est pas proposé
 
-- Aucune promesse de « couverture complète » : B n'a pas dépassé 60 % sur un run en 600 s, 80 % n'est atteint par aucune stratégie.
+- Aucune promesse de « couverture complète » : en simulation (600 s), B n'a pas dépassé 60 % sur un run et 80 % n'est atteint par aucune stratégie. Sur la petite zone réelle, B atteint 80 % en 125 et 134 s (2 runs).
 - Pas d'apprentissage par renforcement, hors périmètre du temps et des sources vérifiées.
