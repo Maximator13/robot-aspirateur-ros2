@@ -609,23 +609,29 @@ Dans cette fiche, « Maxime » désigne l'étudiant principal.
 | 1 | Titre et question | 0:10 | Binôme | |
 | 2 | Sommaire | 0:15 | Binôme | |
 | 3 | Le problème (photo du robot) | 0:20 | Binôme | 1 |
-| 4 | Ce qui existe | 0:40 | Binôme | 9 (tableau) |
-| 5 | Deux stratégies (algorigrammes) | 0:50 | Maxime | 4.1 et 4.2 |
-| 6 | Schéma de principe A | 0:35 | Maxime | 3 |
-| 7 | Schéma de principe B | 0:45 | Maxime | 3 |
-| 8 | Démo (vidéo + capture RViz) | 0:30 | Maxime | |
-| 9 | Essai 1 : simulation | 0:40 | Binôme | 4.3 et 7.1 |
-| 10 | Pourquoi si peu d'écart | 0:45 | Maxime | 5 (borne optimiste) et 6 |
-| 11 | Robot réel : le problème Nav2 | 0:40 | Maxime | 8, 6 |
-| 12 | Robot réel : notre suiveur | 0:40 | Maxime | 4.5 |
-| 13 | Essai 2 : résultat réel (photo) | 0:50 | Maxime | 7.2 |
-| 14 | Essai 3 : jumeau numérique | 0:40 | Maxime | 7.3 |
-| 15 | Limites | 0:30 | Binôme | 9 |
-| 16 | Conclusion et perspectives | 0:40 | Binôme | 9 |
+| 4 | Ce qui existe | 0:35 | Binôme | 9 (tableau) |
+| 5 | Deux stratégies (algorigrammes) | 0:45 | Maxime | 4.1 et 4.2 |
+| 6 | Schéma de principe A (cadre = aspi_random.launch.py) | 0:30 | Maxime | 3 |
+| 7 | Schéma de principe B (cadre = aspi_planned.launch.py) | 0:40 | Maxime | 3 |
+| 8 | Démo (vidéo réelle + vidéo Gazebo) | 0:25 | Maxime | |
+| 9 | Essai 1 : ce qu'on simule (Gazebo, carte, trajet de B) | 0:25 | Binôme | 4.2 et 5 |
+| 10 | Essai 1 : résultat en simulation | 0:35 | Binôme | 4.3 et 7.1 |
+| 11 | Pourquoi si peu d'écart (70 m : distance roulée par B en 10 min) | 0:40 | Maxime | 5 (borne optimiste) et 6 |
+| 12 | Essai 2 : le terrain réel (photo, carte, RViz) | 0:20 | Maxime | 6 |
+| 13 | Robot réel : Nav2 conduit avec une position périmée | 0:35 | Maxime | 8, 6 |
+| 14 | Robot réel : notre suiveur (cadre = aspi_real_follow.launch.py) | 0:35 | Maxime | 4.5 |
+| 15 | Essai 2 : résultat réel (photo) | 0:45 | Maxime | 7.2 |
+| 16 | Essai 3 : jumeau numérique | 0:35 | Maxime | 7.3 |
+| 17 | Limites | 0:25 | Binôme | 9 |
+| 18 | Conclusion et perspectives | 0:35 | Binôme | 9 |
 
-Temps de parole : binôme 3 min 15 ; Maxime 6 min 15. Total 9 min 30, soit 30 s de marge. Si on dépasse, raccourcir les slides 4 et 10.
+Temps de parole : binôme 3 min 20 ; Maxime 6 min 20. Total 9 min 40 : les notes d'orateur sont un peu plus longues, il faut les résumer à l'oral.
 
-Points de vigilance pour le binôme : la slide 9 porte le résultat de simulation et doit expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 15 dit les limites sans les minimiser.
+**Ce qu'est le suiveur (à savoir expliquer)** : `coverage_follower` est un nœud ROS écrit par l'équipe. Il reçoit le plan (`/coverage_path`) et la position du robot (TF, odométrie seule), et publie directement `/cmd_vel`. Pour chaque point : s'il est mal orienté (plus de 20°), il tourne sur place ; sinon il avance en corrigeant son cap ; à moins de 8 cm, il passe au point suivant. Pause si obstacle à moins de 15 cm, point sauté après 40 s, arrêt si plus de LiDAR ou de position depuis 1 s.
+
+**Les 27 s de la slide 13 (à savoir expliquer)** : Nav2 ne fait pas attendre le robot 27 s. La position qu'il reçoit d'AMCL (transformation map → odom) porte une date vieille de 27 s : il conduit avec une position périmée, d'où les faux « but atteint ». L'origine exacte du retard (horloge, Wi-Fi) n'a pas été trouvée.
+
+Points de vigilance pour le binôme : la slide 10 porte le résultat de simulation et doit expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 17 dit les limites sans les minimiser.
 
 Pendant les questions : répondez à celles marquées « Binôme OK ». Pour les autres, laissez l'étudiant répondre, puis complétez si besoin.
 
@@ -733,5 +739,5 @@ ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/
 - **Cause du gel de TF (B3)** et **cause du blocage de Nav2 sur le robot réel** : non établies.
 - **Existence d'un rosbag d'un run réel** : le journal du 9/10 note leur absence ; à confirmer.
 - **Schéma système contre `rqt_graph`** : l'exigence du brief n'a pas été revérifiée depuis les dernières modifications.
-- **Photo ou vidéo du robot réel** pour les slides 3 (photo du robot), 8 (vidéo de démo) et 13 (photo dans la zone) : à fournir par l'étudiant.
+- **Photo ou vidéo du robot réel** pour les slides 3 (photo du robot), 8 (vidéo du robot réel), 12 (photo de la zone) et 15 (photo dans la zone) : à fournir par l'étudiant.
 - **Un seul fichier de référence pour le jumeau** : `docs/JOUR_ROBOT.md` n'a pas été relu pour cette fiche.
