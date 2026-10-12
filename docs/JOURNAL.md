@@ -733,3 +733,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : une question (« planifier aide-t-il à mieux aspirer ? »), un sommaire en 4 parties, trois essais racontés comme une enquête (simulation : le plan est bon mais Nav2 perd du temps ; robot réel : Nav2 bloque, un suiveur simple débloque ; jumeau : vérification). Figures épurées générées par `scripts/plot_slides.py` (une idée par figure). Détails techniques en annexes. Documents livrés en PDF dans `livrables/`.
 - **Justification** : 10 min de présentation ; le jury doit suivre un raisonnement, les détails servent aux 10 min de questions.
 - **Résultat-leçon** : la comparaison « robot parfait 76 % contre Nav2 60 % à distance égale » explique à elle seule pourquoi l'écart A/B est faible en simulation. Leçon : une présentation se construit autour d'une question et de sa réponse, pas autour de la chronologie.
+
+### 2026-10-12 · Pourquoi A plafonne sur le robot réel
+
+- **Contexte** : sur la courbe réelle, les deux essais A stagnent entre 50 et 100 s ; A couvre aussi plus dans le jumeau (82,7 %) qu'en réel (73–75 %). L'explication retenue jusque-là (dérive d'odométrie) ne correspondait pas à ce que l'étudiant a vu pendant les essais.
+- **Options envisagées** : dérive de la position seule ; temps passé le long des murs, dans la bande exclue de la mesure ; repassages aléatoires.
+- **Choix** : présenter l'observation de terrain en premier (A allait plus près des murs et les longeait), la dérive en second, sans trancher.
+- **Justification** : les CSV montrent que A roule pendant les plateaux (environ 2,5 m entre 50 et 100 s) : il n'est pas arrêté. Sur les intervalles d'au moins 10 s sans gain, A parcourt 55 à 60 % de sa distance en réel, contre 50 % dans le jumeau.
+- **Résultat-leçon** : sans enregistrement de trajectoire (pas de rosbag en réel), on ne peut pas départager les deux causes. Leçon : confronter l'interprétation des chiffres à l'observation directe, et enregistrer la trajectoire pour pouvoir trancher.

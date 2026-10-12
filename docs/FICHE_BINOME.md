@@ -419,7 +419,8 @@ Ce qu'on ne peut pas dire : une variabilité (2 + 2 runs), ou une transposition 
 
 Comment lire :
 - **Solide** : les distances sont quasi identiques entre jumeau et réel (B 9,7 m contre 9,8 m ; A 19,3 m contre 19,7 et 20,9 m), car elles dépendent surtout du trajet.
-- **Fragile** : A est plus haut en simulation (82,7 % contre 73,1 et 74,8 %). Hypothèse non testée : odométrie parfaite en simulation, alors que la dérive pénalise le robot réel. Le hasard de la seed n'est pas exclu.
+- **Fragile** : A est plus haut en simulation (82,7 % contre 73,1 et 74,8 %). Deux hypothèses : (1) observé pendant les essais réels, A allait plus près des murs et les longeait, dans la bande de 20 cm que la mesure ne compte pas ; en réel, 55 à 60 % de sa distance est faite sans gain de surface, contre 50 % dans le jumeau ; (2) odométrie parfaite en simulation, alors que la dérive pénalise le robot réel. Pas d'enregistrement de trajectoire pour trancher ; le hasard de la seed n'est pas exclu.
+- **Plateaux de A (par exemple de 50 à 100 s en réel)** : A roule (environ 2,5 m) mais ne gagne pas de surface : il repasse où il est déjà passé (rien ne lui dit où il a nettoyé) ou longe les murs dans la bande non comptée.
 - B suiveur un peu plus bas en simulation (93,1 % contre 96,5 à 98,4 %) : pas d'explication vérifiée.
 - **Nav2 bloque aussi dans le jumeau**, sans Wi-Fi ni horloge réelle. Hypothèse (un seul run) : la géométrie étroite de la zone joue, pas seulement le Wi-Fi.
 
