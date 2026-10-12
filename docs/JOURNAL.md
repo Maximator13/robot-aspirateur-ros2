@@ -650,3 +650,54 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
   4. Peu de runs (2 par stratégie), une seule pièce, vitesse réduite à 0,10 m/s pour la sécurité.
 - **Justification** : ces limites viennent de l'absence de recalage par LiDAR et de l'odométrie seule, pas d'un défaut de l'algorithme de planification.
 - **Résultat-leçon** : sans LiDAR de recalage, le repère du robot dérive et la mesure de couverture s'éloigne de la réalité. Présenter ces limites, plutôt que de les masquer, fait partie de l'évaluation. Perspectives : recalage LiDAR (AMCL ou équivalent) et suivi de mur.
+
+### 2026-10-12 · Décision : jumeau numérique de la zone réelle pour captures et comparaison
+
+- **Contexte** : le robot réel est terminé. Il faut des captures Gazebo et RViz pour les slides, et une comparaison simulation / réalité sur la même géométrie.
+- **Options envisagées** : (a) captures sur `turtlebot3_world`, le monde du protocole de simulation ; (b) jumeau numérique de la zone réelle.
+- **Choix** : option (b), demandée par l'étudiant. Le monde Gazebo `worlds/zone_reelle.world` est généré à partir de la carte réelle par `scripts/make_world_from_map.py` : fusion des cellules murs en 96 boîtes de 0,25 m de haut, couverture exacte des 486 cellules murs vérifiée, zone fermée. Un argument `world_file` est ajouté à `launch/sim.launch.py`, vide par défaut : le protocole de simulation reste inchangé.
+- **Justification** : les runs du jumeau utilisent les mêmes launch et réglages que le robot réel (`use_sim_time:=true`, 0,10 m/s, mode `static`, 300 s). La zone atteignable compte 620 cellules, comme en réel.
+- **Résultat-leçon** : le jumeau permet de comparer simulation et réalité sur la même géométrie. Le protocole de `turtlebot3_world` n'est pas modifié.
+
+### 2026-10-12 · Résultats : jumeau numérique comparé au robot réel (1 run par cas)
+
+- **Contexte** : un run par configuration sur le jumeau, 300 s. Les CSV sont dans `results/jumeau/`.
+- **Options envisagées** : voir l'entrée « Décision : jumeau numérique » ci-dessus.
+- **Choix** : résultats consignés tels quels, à comparer avec les runs réels du 12/10.
+  - A (RANDOM, seed 1) : jumeau 82,7 % en 300 s, 19,3 m, 28 near_collisions. Réel (seeds 1 et 3) : 73,1 % et 74,8 %, 19,7 m et 20,9 m.
+  - B suiveur : jumeau 93,1 %, 9,7 m, 20 near_collisions ; trajet fini vers 159 s ; premier waypoint sauté après 40 s. Réel : 98,4 % et 96,5 %, 9,8 m.
+  - B Nav2 : jumeau 67,7 %, 7,6 m, 48 near_collisions en fin de run (le CSV donne 48, la note de séance indiquait 46). Couverture figée dès environ 107 s ; near_collisions passe à 5 vers 125 s, puis augmente.
+- **Justification** : même géométrie, mêmes réglages : la comparaison est plus directe qu'entre simulation et réel avec des mondes différents. Un seul run par cas : aucune conclusion statistique.
+- **Résultat-leçon** : pour A et B suiveur, le jumeau donne des ordres de grandeur proches du réel. B Nav2 se bloque aussi en simulation (entrée suivante).
+
+### 2026-10-12 · Constat : Nav2 bloque aussi en simulation sur la zone étroite
+
+- **Contexte** : sur le jumeau, la stratégie B exécutée par Nav2 se bloque vers 125 s contre le mur diagonal près du départ. Les comportements de récupération (recoveries) échouent.
+- **Options envisagées** : non consignées.
+- **Choix** : aucune correction de Nav2 n'est faite ; le constat est consigné tel quel.
+- **Justification** : le blocage se produit en simulation, sans Wi-Fi ni horloge réelle. L'impasse du robot réel n'est donc pas seulement due au réseau ou à l'horloge. Hypothèse à confirmer : un seul run.
+- **Résultat-leçon** : Nav2 peut bloquer dans cette zone étroite, même sans les contraintes du réel. Il faudrait plusieurs runs avant de conclure sur la cause.
+
+### 2026-10-12 · Incident : captures RViz prises derrière le terminal
+
+- **Contexte** : le premier essai de captures par copie de l'écran donnait une fenêtre RViz restée derrière le terminal. Windows refuse de passer une fenêtre au premier plan de force. Les captures de cet essai ont été supprimées.
+- **Options envisagées** : copie de l'écran (essai, échoué) ; autres options non consignées.
+- **Choix** : capture du contenu de chaque fenêtre par la fonction Windows `PrintWindow`.
+- **Justification** : `PrintWindow` capture le contenu d'une fenêtre même si elle est recouverte. La capture ne dépend donc plus de l'ordre des fenêtres.
+- **Résultat-leçon** : vérifier une capture avant d'en produire en série.
+
+### 2026-10-12 · Résultat : 18 captures pour les slides (`results/figures/`)
+
+- **Contexte** : captures Gazebo et RViz pour les trois scénarios du jumeau.
+- **Options envisagées** : non consignées.
+- **Choix** : 18 captures dans `results/figures/`, nommées `jumeau_<scénario>_<fenêtre>_<instant>.png`. Pour chaque scénario : A (`t030`, `t150`, `t300`), B suiveur (`t030`, `t090`, `fin_trajet`), B Nav2 (`t030`, `t150`, `fin_trajet`), en Gazebo et en RViz.
+- **Justification** : ces captures servent de matière aux slides de soutenance et à la vidéo de démonstration.
+- **Résultat-leçon** : une capture vérifiée d'abord évite de refaire toute une série.
+
+### 2026-10-12 · Rangement : CSV de démonstration hors protocole (`results/invalides/`)
+
+- **Contexte** : un run A de démonstration sur `turtlebot3_world` a été fait avant le passage au jumeau : `demo_RANDOM_1_20261012-112040.csv`.
+- **Options envisagées** : non consignées.
+- **Choix** : fichier rangé dans `results/invalides/`, avec les autres essais hors protocole.
+- **Justification** : éviter de mélanger un run de démonstration avec les données du protocole. Les runs du jumeau sont dans `results/jumeau/`.
+- **Résultat-leçon** : séparer dès la création les données de démonstration et d'essai des données de protocole.

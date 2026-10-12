@@ -6,7 +6,11 @@ tournent exactement dans le même monde, avec le même robot et la même positio
 Arguments :
   headless : true -> pas de gzclient (fenêtre Gazebo)
   fast     : true -> monde accéléré (real_time_update_rate = 0) + lockstep
-  spawn_x, spawn_y : position de départ dans le monde (= origine de la carte de référence)
+  spawn_x, spawn_y : position de départ dans le monde (= origine de la carte de référence) ;
+                     défaut (-2.0, -0.5) = turtlebot3_world
+  world_file : autre monde .world (ex. jumeau de la zone réelle : worlds/zone_reelle.world, à lancer
+               avec spawn_x:=0.0 spawn_y:=0.0) ; vide = monde du protocole. Si renseigné, fast est
+               ignoré (monde en temps réel, lockstep false).
 """
 import os
 
@@ -15,7 +19,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -37,6 +41,7 @@ def generate_launch_description():
     fast = LaunchConfiguration('fast')
     spawn_x = LaunchConfiguration('spawn_x')
     spawn_y = LaunchConfiguration('spawn_y')
+    world_file = LaunchConfiguration('world_file')
 
     args = [
         DeclareLaunchArgument('headless', default_value='false',
@@ -45,7 +50,11 @@ def generate_launch_description():
                               description='true : monde sans limite de temps réel (accéléré)'),
         DeclareLaunchArgument('spawn_x', default_value='-2.0'),
         DeclareLaunchArgument('spawn_y', default_value='-0.5'),
+        # Autre monde (ex. jumeau de la zone réelle, worlds/zone_reelle.world) ; vide = turtlebot3_world
+        DeclareLaunchArgument('world_file', default_value='',
+                              description='Chemin d\'un monde .world (temps réel) ; vide = monde du protocole'),
     ]
+    sans_monde = ["'", world_file, "' == ''"]
 
     # Monde d'origine (temps réel) ou copie accélérée (real_time_update_rate = 0).
     # En accéléré, lockstep : la physique attend la mise à jour des capteurs (pas de scan perdu).
@@ -53,10 +62,13 @@ def generate_launch_description():
     # le launch parent, le générateur aléatoire de Gazebo est fixé lui aussi (reproductibilité).
     gzserver_normal = gzserver(
         gazebo_ros_dir, os.path.join(tb3_gazebo_dir, 'worlds', 'turtlebot3_world.world'),
-        UnlessCondition(fast), 'false')
+        IfCondition(PythonExpression(sans_monde + [" and '", fast, "'.lower() not in ('true', '1')"])), 'false')
     gzserver_fast = gzserver(
         gazebo_ros_dir, os.path.join(aspi_dir, 'worlds', 'turtlebot3_world_fast.world'),
-        IfCondition(fast), 'true')
+        IfCondition(PythonExpression(sans_monde + [" and '", fast, "'.lower() in ('true', '1')"])), 'true')
+    gzserver_monde = gzserver(
+        gazebo_ros_dir, world_file,
+        IfCondition(PythonExpression(["'", world_file, "' != ''"])), 'false')
     gzclient = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(gazebo_ros_dir, 'launch', 'gzclient.launch.py')),
@@ -77,4 +89,4 @@ def generate_launch_description():
                    '-timeout', '120'])
 
     return LaunchDescription(args + [
-        gzserver_normal, gzserver_fast, gzclient, robot_state_publisher, spawn])
+        gzserver_normal, gzserver_fast, gzserver_monde, gzclient, robot_state_publisher, spawn])

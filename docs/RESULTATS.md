@@ -228,3 +228,61 @@ Notes de lecture :
 2. **B s'arrête à environ 20 cm des murs** : marge du planificateur 15,5 cm (rayon 0,105 m + marge de sécurité 0,05 m) plus tolérance d'arrivée de 8 cm. Le pourcentage est calculé sur la même zone atteignable pour A et B, donc cette bande n'est nettoyée par aucun des deux. Une passe finale de suivi de mur est une perspective, non testée.
 3. **Blocage de début de B** : avec le décalage carte/réel, un waypoint libre sur la carte peut se trouver contre un vrai carton ; le robot se met en pause (obstacle à moins de 0,15 m). C'est ce qui s'est passé au run de 10 h 45 (deux waypoints sautés après 40 s chacun).
 4. **Peu de runs** (2 + 2, plus un incident), **une seule zone**, **vitesse réduite à 0.10 m/s** par sécurité, **durée de run B n°2 écourtée** (arrêt manuel à 170 s).
+
+### 7.7 Jumeau numérique de la zone réelle (simulation)
+
+Cette sous-section compare, sur la même géométrie, le robot réel (séance du 12/10, 7.6) et une simulation Gazebo de la zone en carton. Tous les chiffres viennent des CSV `results/jumeau/*.csv` et `results/robot_reel/*_20261012-*.csv` ; les « % à t s » sont interpolés linéairement. Figure et tableau sont reproductibles avec `scripts/plot_jumeau.py`.
+
+**Protocole**
+
+- Monde Gazebo `zone_reelle.world`, généré par `scripts/make_world_from_map.py` à partir de `maps/zone_reelle.yaml` : 96 boîtes couvrant exactement les 486 cellules murs de la carte ; zone fermée ; départ en (0, 0) (la croix).
+- Mêmes launch et mêmes réglages que sur le robot réel, avec `use_sim_time:=true` : 0,10 m/s, `localization:=static`, `near_collision_distance` 0,20 m, 300 s, 620 cellules atteignables (comme en réel), temps réel, fenêtres ouvertes.
+- **Un seul run par configuration** :
+  - A : `aspi_real_random`, seed 1 ;
+  - B suiveur : `coverage_follower` (`aspi_real_follow`), comme sur le robot réel. Premier waypoint sauté après 40 s ; trajet terminé vers 159 s ;
+  - B Nav2 : `aspi_real_planned`, localisation static, seed 2.
+
+**Tableau des 3 runs jumeau et des runs réels équivalents**
+
+| Run | % à 30 s | % à 60 s | % à 120 s | % final (à) | Temps pour 80 % | Distance (m) | near_collisions | Dernière hausse de couverture |
+|---|---|---|---|---|---|---|---|---|
+| A jumeau, seed 1 | 19,3 | 46,1 | 66,9 | 82,7 % (300 s) | 252 s | 19,3 | 28 | 276 s |
+| B jumeau, suiveur | 10,0 | 32,3 | 70,3 | 93,1 % (301 s) | 139 s | 9,7 | 20 | 155 s |
+| B jumeau, Nav2 (bloqué) | 32,5 | 47,6 | 67,7 | 67,7 % (300 s) | non atteint | 7,6 | 48 | 107 s |
+| A réel, seed 1 | 5,6 | 27,9 | 36,2 | 73,1 % (301 s) | non atteint | 19,7 | 21 | 288 s |
+| A réel, seed 3 | 2,6 | 23,4 | 30,3 | 74,8 % (300 s) | non atteint | 20,9 | 19 | 298 s |
+| B réel n°1, suiveur | 24,4 | 42,7 | 79,3 | 98,4 % (301 s) | 125 s | 9,8 | 8 | 147 s |
+| B réel n°2, suiveur | 11,9 | 30,3 | 75,2 | 96,5 % (170 s, arrêt manuel) | 134 s | 9,8 | 2 | 153 s |
+
+Nav2 dans le jumeau : la couverture est à 67,74 % de 125 s jusqu'à la fin ; la dernière hausse mesurée est à 107 s. Après cela la distance ne gagne que 0,2 m environ (7,4 m à 125 s, 7,6 m à 300 s) et near_collisions passe de 5 (à 125 s) à 48 (à 300 s). Selon les logs du run, les recoveries échouent (« Failed to make progress », backup et spin en échec).
+
+**Figure**
+
+`results/figures/jumeau_vs_reel.png` : robot réel en traits pleins, jumeau en pointillés, même couleur par stratégie (orange pour A, bleu pour B suiveur) ; B Nav2 du jumeau à part, en gris. Les courbes sont les mesures brutes, sans prolongement.
+
+![Jumeau numérique contre robot réel](../results/figures/jumeau_vs_reel.png)
+
+**Interprétation (prudente, 1 run par configuration côté jumeau)**
+
+- **Distances très proches** entre réel et jumeau : B suiveur 9,7 m contre 9,8 m (deux runs réels) ; A 19,3 m contre 19,7 et 20,9 m.
+- **B termine la zone avec environ deux fois moins de distance que A**, dans les deux mondes : 9,7 m contre 19,3 m en simulation, 9,8 m contre 19,7 à 20,9 m en réel. B atteint 80 % en 139 s dans le jumeau (125 et 134 s en réel) ; A l'atteint en 252 s dans le jumeau et ne l'atteint pas en réel en 300 s.
+- **A est plus haut en simulation** : 82,7 % contre 73,1 et 74,8 % en réel, soit +7,9 à +9,6 points, et plus haut à 30, 60 et 120 s. Hypothèse, non testée : en simulation l'odométrie est parfaite, sans dérive ni décalage entre carte et zone réelle (limite 1 de la section 7.6), alors que A tourne beaucoup sur place et accumule de la dérive sur le robot réel. Avec un seul run A simulé, l'écart pourrait aussi venir en partie du hasard de la seed ; on ne peut pas le départager.
+- **B suiveur est un peu plus bas en simulation** : 93,1 % contre 98,4 % et 96,5 % en réel (−3,4 à −5,3 points) ; 70,3 % à 120 s contre 75,2 et 79,3 %. Je n'ai pas d'explication vérifiée (le premier waypoint a été sauté après 40 s dans le jumeau, ce qui peut y contribuer ; à confirmer). B simulé a aussi plus de near_collisions (20 contre 8 et 2) : le jumeau ne reproduit pas exactement le comportement du LiDAR réel près des cartons.
+- **Nav2 bloque aussi en simulation, sur la même zone, près du départ contre le mur diagonal** (couverture figée à 67,74 %, recoveries en échec). L'échec de Nav2 sur le robot réel ne semble donc pas dû seulement au Wi-Fi ou à l'horloge du robot : la géométrie étroite de la zone joue probablement. C'est une hypothèse, appuyée par **un seul run**. Elle n'exclut pas d'autres causes, qui n'ont pas été testées (réglage des costmaps, rayon du robot et marges dans cette zone de 1,6 m²).
+- Pour mémoire, B Nav2 est plus rapide au départ (32,5 % à 30 s) mais se fige ensuite : un pourcentage à 30 s ne prédit pas le pourcentage final.
+
+**Limites**
+
+- 1 run par configuration côté jumeau : aucune variabilité chiffrable, aucune conclusion statistique.
+- Le jumeau reprend la carte réelle (murs exacts, sans défaut) : il ne reproduit ni les imperfections des cartons, ni le bruit réel du LiDAR, ni les glissements.
+- L'odométrie simulée est parfaite par rapport au robot réel (hypothèse expliquant l'écart sur A, non démontrée).
+- Les seeds ne sont pas identiques entre configurations (A réel seeds 1 et 3 contre jumeau seed 1 ; B Nav2 seed 2).
+
+**Captures d'écran** (`results/figures/`, fenêtres Gazebo et RViz)
+
+- `jumeau_A_gazebo_t030.png`, `jumeau_A_gazebo_t150.png`, `jumeau_A_gazebo_t300.png` : vue Gazebo du run A à 30, 150 et 300 s.
+- `jumeau_A_rviz_t030.png`, `jumeau_A_rviz_t150.png`, `jumeau_A_rviz_t300.png` : RViz du run A aux mêmes instants. À 300 s, la zone couverte (magenta) est visible dans la zone fermée, entourée du scan LiDAR en rouge ; le cadrage ne montre pas toute la zone, on n'en déduit pas de pourcentage.
+- `jumeau_B_gazebo_t030.png`, `jumeau_B_gazebo_t090.png`, `jumeau_B_gazebo_fin_trajet.png` : Gazebo, B suiveur à 30 s, 90 s et en fin de trajet.
+- `jumeau_B_rviz_t030.png`, `jumeau_B_rviz_t090.png`, `jumeau_B_rviz_fin_trajet.png` : RViz, B suiveur. À 90 s, le trajet en lacets (vert) est affiché et la couverture (rose) suit les passages déjà faits, le robot étant au milieu du balayage.
+- `jumeau_Bnav2_gazebo_t030.png`, `jumeau_Bnav2_gazebo_t150.png`, `jumeau_Bnav2_gazebo_fin_trajet.png` : Gazebo, B Nav2 à 30 s, 150 s et en fin de trajet.
+- `jumeau_Bnav2_rviz_t030.png`, `jumeau_Bnav2_rviz_t150.png`, `jumeau_Bnav2_rviz_fin_trajet.png` : RViz, B Nav2. En fin de trajet, la couverture rose s'arrête avant la fin du trajet (vert) : la partie haute n'est pas couverte, et le robot est arrêté près du coin supérieur droit, contre le mur diagonal.
