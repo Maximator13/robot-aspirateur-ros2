@@ -625,7 +625,7 @@ Dans cette fiche, « Maxime » désigne l'étudiant principal.
 | 17 | Limites | 0:25 | Binôme | 9 |
 | 18 | Conclusion et perspectives | 0:35 | Binôme | 9 |
 
-Temps de parole : binôme 3 min 20 ; Maxime 6 min 20. Total 9 min 40 : les notes d'orateur sont un peu plus longues, il faut les résumer à l'oral.
+Temps de parole : binôme 3 min 20 ; Maxime 5 min 50. Total 9 min 10 : les notes d'orateur sont un peu plus longues, il faut les résumer à l'oral.
 
 **Ce qu'est le suiveur (à savoir expliquer)** : `coverage_follower` est un nœud ROS écrit par l'équipe. Il reçoit le plan (`/coverage_path`) et la position du robot (TF, odométrie seule), et publie directement `/cmd_vel`. Pour chaque point : s'il est mal orienté (plus de 20°), il tourne sur place ; sinon il avance en corrigeant son cap ; à moins de 8 cm, il passe au point suivant. Pause si obstacle à moins de 15 cm, point sauté après 40 s, arrêt si plus de LiDAR ou de position depuis 1 s.
 
