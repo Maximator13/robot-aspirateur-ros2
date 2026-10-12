@@ -200,7 +200,7 @@ Si on dépasse : fusionner 7 dans 8 (gain 0:30) ou passer la slide 5 en une phra
 - **Message clé** : nous disons nous-mêmes ce que la mesure ne prouve pas.
 - **Contenu**
   - **Localisation par odométrie seule sur le robot réel** : `map` vers `odom` figée, décalage visible entre murs de la carte et murs réels dans RViz, dérive à chaque rotation sur place (A tourne environ 20 fois). Les pourcentages sont approximatifs, surtout pour A. AMCL a été écarté (il figeait la TF avec Nav2). Un recalage LiDAR est une perspective.
-  - **Marge aux bords** : B s'arrête à environ 20 cm des murs (érosion 15,5 cm plus tolérance d'arrivée de 8 cm). Même zone mesurée pour A et B : cette bande n'est nettoyée par aucun des deux.
+  - **Marge aux bords** : B s'arrête à environ 20 cm des murs (érosion de 0,155 m arrondie à 4 cellules, soit 0,20 m). Même zone mesurée pour A et B : cette bande n'est nettoyée par aucun des deux.
   - **Peu de runs** : 3 + 3 en simulation, 2 + 2 sur le robot réel, 1 par configuration sur le jumeau.
   - **Une seule pièce** en simulation, une seule zone réelle. Vitesse réduite à 0,10 m/s en réel.
   - **B3 bloqué en simulation officielle** (cause non identifiée) ; Nav2 bloqué sur le robot réel et dans le jumeau.
@@ -310,7 +310,7 @@ Dans les CSV, la distance parcourue sert de contrôle : un run est invalide si l
 pas son déplacement physique (pas de rosbag ni de caméra pour recouper).
 
 **Q-N6. Pourquoi B réel s'arrête-t-il à environ 20 cm des murs ?**
-Marge du planificateur de 15,5 cm (rayon 0,105 m plus marge de sécurité 0,05 m) plus tolérance d'arrivée de 8 cm. Le pourcentage est calculé
+Érosion du planificateur : 0,155 m demandés (rayon 0,105 m plus marge 0,05 m), arrondis à 4 cellules de 5 cm, soit 0,20 m appliqués. Le pourcentage est calculé
 sur la même zone pour A et B, donc cette bande n'est nettoyée par aucun des deux. Une passe de suivi de mur est une perspective, non testée.
 
 **Q-N7. Pourquoi B réel atteint 98 % alors que A reste à 73–75 % ?**
@@ -425,7 +425,7 @@ Spirale : insuffisante seule avec des obstacles, classée dans [1], perspective 
 **Impasse Nav2 réelle** : horloge 462 ms vers 30–60 ms ; âge des messages 0,26 s ; TF `map` vers `odom` vieille de 27 s ; pivots de 109° à 174° sans avancer.
 
 Chiffres de réserve : 5564 cellules (13,9 m²) et 112 waypoints en simulation ; 8 waypoints atteints en accéléré contre 69 en temps réel ;
-marge aux bords environ 20 cm (15,5 cm plus 8 cm de tolérance) ; 96 boîtes pour 486 cellules murs dans le jumeau.
+marge aux bords environ 20 cm (érosion de 4 cellules, 0,20 m) ; 96 boîtes pour 486 cellules murs dans le jumeau.
 
 ---
 

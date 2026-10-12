@@ -709,3 +709,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : 13 slides pour 9 min 30, dont « Robot réel », « Impasse Nav2 sur le robot réel », « Jumeau numérique » et « Limites ». Huit questions du jury ajoutées, dont « pourquoi pas Nav2 sur le robot ? ». PERSPECTIVES : P9 (essai réel) marqué réalisé, ajout de P10 (recalage LiDAR) et P11 (suivi de mur).
 - **Justification** : la durée imposée est de 10 min ; les résultats réels sont la meilleure preuve de la démarche.
 - **Résultat-leçon** : la relecture a trouvé 5 erreurs, dont 2 chiffres faux et 2 surestimations (« le suiveur a mieux tenu », « même type de blocage »). Toujours recalculer les chiffres depuis les CSV et formuler un résultat sur 1 run comme une hypothèse.
+
+### 2026-10-12 · Diaporama, fiche du binôme et marge aux murs
+
+- **Contexte** : préparer le diaporama final et une fiche complète pour le coéquipier absent pendant le projet.
+- **Options envisagées** : reprendre le plan tel quel ou relire chaque chiffre contre le code avant de le mettre en slide.
+- **Choix** : diaporama de 14 slides (titre + 13 du plan), notes d'orateur avec la répartition (binôme : 1, 2, 3, 6, 7, 13, 14 ; Maxime : 4, 5, 8 à 12). Fiche `docs/FICHE_BINOME.md` relue avant commit.
+- **Justification** : le jury interroge chaque membre ; le coéquipier doit pouvoir expliquer méthode, chiffres et limites.
+- **Résultat-leçon** : la marge d'environ 20 cm aux murs était expliquée par « 15,5 cm d'érosion + 8 cm de tolérance ». Le code (`erosion_radius_cells`) arrondit à la cellule supérieure : 0,155 m deviennent 4 cellules de 5 cm, soit 0,20 m. RESULTATS et PLAN_SOUTENANCE sont corrigés. La relecture a aussi montré qu'un run de démo écrit dans `results/` et fausserait les moyennes si l'on relançait `plot_results.py` : la fiche dirige les démos vers `/tmp/demo`. Leçon : relire le code plutôt que le document quand une explication paraît bricolée.
