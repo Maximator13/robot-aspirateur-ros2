@@ -741,3 +741,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : présenter l'observation de terrain en premier (A allait plus près des murs et les longeait), la dérive en second, sans trancher.
 - **Justification** : les CSV montrent que A roule pendant les plateaux (environ 2,5 m entre 50 et 100 s) : il n'est pas arrêté. Sur les intervalles d'au moins 10 s sans gain, A parcourt 55 à 60 % de sa distance en réel, contre 50 % dans le jumeau.
 - **Résultat-leçon** : sans enregistrement de trajectoire (pas de rosbag en réel), on ne peut pas départager les deux causes. Leçon : confronter l'interprétation des chiffres à l'observation directe, et enregistrer la trajectoire pour pouvoir trancher.
+
+### 2026-10-12 · Montrer ce qui a vraiment été couvert
+
+- **Contexte** : sur la carte de la pièce simulée, la zone à couvrir colorée donnait l'impression que toute la pièce avait été couverte ; on ne voyait pas la différence entre A et B.
+- **Options envisagées** : expliquer à l'oral, ou reconstruire la carte de couverture réelle de chaque essai.
+- **Choix** : `scripts/plot_couverture.py` rejoue le rosbag de l'essai n°1 de A et de B (positions `/odom` ramenées au repère map) avec le même calcul que le tracker. La zone à couvrir est en beige, la zone couverte en couleur, avec une échelle de 1 m (pièce d'environ 5,5 × 5,1 m).
+- **Justification** : une image de ce qui a été nettoyé se lit sans explication.
+- **Résultat-leçon** : reconstruction vérifiée contre les CSV (54,6 % contre 54,4 % pour A, 59,6 % contre 59,8 % pour B). On voit A traverser la pièce en tous sens, et B couvrir en bandes depuis le bas sans finir le haut : en 10 min il roule 70 m sur les 92 m de son plan. Leçon : les rosbags enregistrés pendant le protocole permettent de produire après coup des preuves visuelles.

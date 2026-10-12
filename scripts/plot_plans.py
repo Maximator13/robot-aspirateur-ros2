@@ -51,7 +51,7 @@ def plan(yaml_name, start, out_name):
     img = np.ones((h, w, 3)) * 0.82          # inconnu : gris
     img[grid == 0] = (0.97, 0.96, 0.93)      # libre : clair
     img[grid >= 50] = (0.15, 0.17, 0.22)     # mur : foncé
-    img[reachable] = (0.83, 0.89, 0.95)      # zone atteignable mesurée : bleu pâle
+    img[reachable] = (0.93, 0.90, 0.84)      # zone à couvrir (atteignable) : beige
     extent = (ox, ox + w * res, oy, oy + h * res)
 
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -61,6 +61,10 @@ def plan(yaml_name, start, out_name):
     rows, cols = np.nonzero(reachable)  # cadrage : zone atteignable + 0,5 m
     ax.set_xlim(ox + cols.min() * res - 0.5, ox + (cols.max() + 1) * res + 0.5)
     ax.set_ylim(oy + rows.min() * res - 0.5, oy + (rows.max() + 1) * res + 0.5)
+    xb = ox + cols.min() * res - 0.3            # barre d'échelle 1 m sous la zone
+    yb = oy + rows.min() * res - 0.35
+    ax.plot([xb, xb + 1.0], [yb, yb], color='black', linewidth=4)
+    ax.text(xb + 0.5, yb + 0.06, '1 m', ha='center', fontsize=20)
     ax.set_xticks([])
     ax.set_yticks([])
     for s in ax.spines.values():
