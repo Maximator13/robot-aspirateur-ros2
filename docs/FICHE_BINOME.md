@@ -600,7 +600,7 @@ Il a permis de prouver que la TF était publiée à 5 Hz par AMCL pendant le gel
 
 ## 12. Répartition proposée de la présentation à deux
 
-Le diaporama compte 16 slides principales et 4 annexes (A1 réglages de Nav2, A2 bugs et leçons, A3 tous les chiffres, A4 références), sans code. Les annexes ne sont pas présentées : elles servent à répondre aux questions. Chaque slide a des notes d'orateur (ce qu'il faut dire, durée, qui parle) : les lire, elles complètent cette fiche.
+Le diaporama compte 22 slides principales, toutes sur fond blanc, et 6 annexes, sans code : A1 algorigramme de A (random_walker), A2 algorigramme du planner B, A3 algorigramme du suiveur, A4 algorigramme de la mesure (tracker), A5 bugs et leçons, A6 références. Les annexes ne sont pas présentées : elles servent à répondre aux questions. Chaque slide a des notes d'orateur (ce qu'il faut dire, durée, qui parle) : les lire, elles complètent cette fiche.
 
 **Le fil conducteur** : « Planifier sur une carte aide-t-il à mieux aspirer ? » Hypothèse : oui. Essai 1 (simulation) : B passe devant A quand il ne se bloque pas, mais l'écart est faible ; un robot parfait qui suivrait notre plan ferait 76 % là où Nav2 fait 60 % : le plan est bon, l'exécutant (Nav2) perd du temps. Essai 2 (robot réel) : Nav2 ne fait pas avancer le robot (faux succès) ; on garde le plan et on le fait suivre par un conducteur simple ; B couvre alors 80 % en 2 min, A jamais. Essai 3 (jumeau) : la zone réelle rejouée dans Gazebo donne les mêmes distances, ce qui rend le résultat réel crédible. Réponse : planifier aide, à condition d'un exécutant fiable.
 
@@ -637,7 +637,7 @@ Temps de parole : binôme 3 min 25 ; Maxime 6 min 05. Total 9 min 30 : c'est ser
 
 **Les 27 s de la slide 14 (à savoir expliquer)** : Nav2 ne fait pas attendre le robot 27 s. La position qu'il reçoit d'AMCL (transformation map → odom) porte une date vieille de 27 s : il conduit avec une position périmée, d'où les faux « but atteint ». L'origine exacte du retard (horloge, Wi-Fi) n'a pas été trouvée.
 
-Points de vigilance pour le binôme : les slides 9 et 10 portent le résultat de simulation (cartes de ce que A et B ont couvert) et doivent expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 21 dit les limites sans les minimiser.
+Points de vigilance pour le binôme : les slides 9 et 10 portent le résultat de simulation (cartes de ce que A et B ont couvert) et doivent expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A6) ; la slide 21 dit les limites sans les minimiser.
 
 Pendant les questions : répondez à celles marquées « Binôme OK ». Pour les autres, laissez l'étudiant répondre, puis complétez si besoin.
 

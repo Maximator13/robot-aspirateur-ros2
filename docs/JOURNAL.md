@@ -765,3 +765,10 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : A graines 4 et 5 avec fenêtres, A6 et B4 à B7 sans fenêtre Gazebo, RViz seul (vue centrée sur la pièce). B4 et B5 lancés d'abord avec fenêtres : bloqués (19,4 et 21,9 %), log plein de « Control loop missed its desired rate » ; rangés hors protocole dans `results/fenetres/`.
 - **Justification** : ne pas mélanger des conditions différentes pour B, sensible à la charge du processeur (déjà vu en T0).
 - **Résultat-leçon** : A : 6 essais entre 43,3 et 59,9 % (moyenne 52,2 %). B : 3 réussis sur 7 (59,8 / 55,4 / 62,1 %), 4 blocages : graine 3 (8/10) et 6 à 17 et 22 % ; graines 4 et 7 bloquées par une TF map → odom figée, puis la position a sauté quand la localisation a repris. Notre `coverage_tracker` a compté ces sauts : 175 m et 465 m « parcourus », pourcentages faux (41 et 57 %). Ces deux CSV sont dans `results/invalides/`, écartés des moyennes mais comptés comme blocages. Leçon : la mesure aussi doit rejeter l'impossible (perspective P12) ; et un essai qui « réussit trop bien » doit être vérifié par une grandeur physique (ici la distance).
+
+### 2026-10-12 · Annexes en algorigrammes, fonds blancs
+
+- **Contexte** : les annexes (tableaux de réglages et de chiffres) n'étaient pas compréhensibles ; les fonds de slide variaient.
+- **Choix** : toutes les slides sur fond blanc ; annexes remplacées par quatre algorigrammes (random_walker, coverage_planner, coverage_follower, coverage_tracker), une slide bugs et leçons en langage simple, et les références. Les chiffres détaillés restent dans `docs/RESULTATS.md`.
+- **Justification** : les annexes servent à répondre aux questions « comment ça marche ? » : un algorigramme y répond mieux qu'un tableau.
+- **Résultat-leçon** : chaque algorigramme reprend `docs/ALGORIGRAMMES.md` en langage courant ; aucune ligne de code dans le diaporama.
