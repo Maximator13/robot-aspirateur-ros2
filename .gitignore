@@ -10,3 +10,4 @@ __pycache__/
 .pytest_cache/
 # Rosbags (volumineux) — les CSV et PNG de results/ restent versionnés
 results/bags/
+results/fenetres/bags/

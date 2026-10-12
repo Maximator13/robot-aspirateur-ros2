@@ -24,6 +24,8 @@ Les figures et le tableau sont produits par `scripts/plot_results.py`.
 
 ## 2. Résultats
 
+> **Mise à jour du 12/10** : les tableaux ci-dessous sont l'état du 8/10 (3 essais par stratégie). Les essais complémentaires du 12/10 portent le total à 6 essais pour A et 5 pour B (section 6 bis) : A 52,2 ± 5,7 % (n=6), B 43,3 ± 21,8 % (n=5), B réussis seuls 59,1 % (n=3). Les passages ci-dessous qui citent « n = 3 » décrivent les 3 essais du 8/10.
+
 ### Figures
 
 - `results/coverage_vs_time.png` : moyenne (trait épais), runs individuels (pointillés) et enveloppe min/max, par stratégie.
@@ -75,7 +77,7 @@ Le run B3 s'arrête à 17.2 %. Sa couverture n'augmente plus après environ 158 
   - Si l'on compare la moyenne de A à la moyenne de B1 et B2 seuls, B1 et B2 devancent la moyenne de A dès environ 4 min (à partir de 233 s, de façon durable) : +3.0 points à 300 s, +5.4 à 420 s, +10.8 à 480 s (+6.5 à 600 s). Ces écarts portent sur 2 runs de B contre 3 de A.
 - **Sécurité** : B fait nettement moins de near_collisions (0 et 2) que A (21 à 32). C'est cohérent avec une trajectoire calculée sur la carte et un évitement d'obstacles par Nav2. Hypothèse non vérifiée : A ne réagit qu'au dernier moment (il s'arrête à 0.25 m dans un cône de ±30°), alors que near_collisions compte les passages sous 0.15 m sur 360°. Les deux seuils et les deux secteurs diffèrent, donc la comparaison de ce compteur entre A et B reste indicative.
 - **Objectif non atteint** : aucune stratégie ne couvre 80 % en 10 min.
-- **Pas de conclusion statistique ferme** sur le % final. Avec n = 3 et une dispersion de B de 23.4 points, les intervalles de A et B se recouvrent largement.
+- **Pas de conclusion statistique ferme** sur le % final. Avec n = 3 (état du 8/10 ; 6 et 5 au total après le 12/10, section 6 bis) et une dispersion de B de 23.4 points, les intervalles de A et B se recouvrent largement.
 - **Régularité** : B1 et B2 ont des courbes presque identiques sur la majeure partie du run, car le trajet est planifié. A varie plus d'un run à l'autre en cours de route (par exemple à 420 s : 28.4 % pour A1 contre 40.3 % pour A3).
 - **Reproductibilité (observation sur la figure `results/coverage_vs_time_runs.png`, 2 runs)** : quand Nav2 fonctionne, B1 et B2 sont quasi superposées jusqu'à environ 8 min, alors que les runs de A divergent dès environ 2 min. Le balayage est déterministe, l'aléatoire ne l'est pas. La variance de B vient de la fiabilité (B3), pas de la stratégie. Cela reste une observation sur deux runs, pas une démonstration.
 - **Où B perd du temps** (analyse du journal, runs de réglage) :
@@ -115,7 +117,7 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 
 ## 6. Limites
 
-- **Peu de runs** : 3 par stratégie. Les écarts-types sont peu fiables. Aucun test statistique n'est proposé.
+- **Peu de runs** : 3 par stratégie le 8/10, puis 6 pour A et 5 retenus pour B au total (section 6 bis). Les écarts-types sont peu fiables. Aucun test statistique n'est proposé.
 - **Une seule pièce** : `turtlebot3_world`, de 13.9 m² atteignables. Les résultats ne se généralisent pas à d'autres plans.
 - **Odométrie parfaite en simulation** : A ne dérive pas. En conditions réelles, A serait mesuré avec une dérive, donc moins fiable. Le TF statique `map → odom` de A suppose cette absence de dérive.
 - **Mesure de B sur la pose AMCL** : la position de B pour la couverture est estimée par AMCL, celle de A vient de l'odométrie simulée. Les deux sources n'ont pas la même erreur.
@@ -126,6 +128,81 @@ Essais en temps réel. Un facteur modifié à la fois, mesuré séparément. Les
 - **Blocages au démarrage de Nav2** : l'executor est resté bloqué au démarrage 2 fois sur 5 lancements avant correctif (journal). Le correctif est validé seulement par les runs officiels.
 - **Facteur temps réel** (temps simulé / temps mural), mesuré sur les runs officiels : B1 0.91, B2 0.84, B3 0.94 (temps réel, donc inférieur à 1) ; A en mode accéléré ×2.84, ×3.06, ×3.08 (seeds 1, 2, 3). Un facteur inférieur à 1 en B peut jouer sur les cadences de Nav2.
 - **Seeds de B** : le trajet planifié est le même d'un run à l'autre. Les différences entre runs de B viennent des aléas d'exécution (Nav2, AMCL, machine), pas d'un tirage aléatoire comme en A.
+
+## 6 bis. Essais complémentaires du 12/10 (simulation)
+
+Chiffres tirés des CSV `results/RANDOM_{4,5,6}_20261012-*.csv`, `results/BOUSTROPHEDON_{5,6}_20261012-*.csv`, `results/invalides/`, `results/fenetres/`, et de `results/summary.md` (recalculé et vérifié sur les CSV). Les « % à 300 s » sont interpolés comme en section 2. Les nombres de messages de log (« collision ahead », etc.) sont ceux transmis après lecture des logs de run ; ils ne sont pas relus ici.
+
+### Conditions
+
+- Même monde `turtlebot3_world`, même départ, 600 s, mêmes réglages T5 que les runs du 8/10.
+- **A (graines 4, 5, 6), mode accéléré** : graines 4 et 5 lancées **avec les fenêtres Gazebo et RViz** (écart au protocole, qui était sans fenêtre) ; graine 6 sans fenêtre Gazebo, RViz seul.
+- **B avec Nav2** :
+  - graines 4 et 5 lancées avec les fenêtres : bloquées à 19,4 % et 21,9 %, rangées **hors protocole** dans `results/fenetres/`. Le log de B5 contient de nombreux « Control loop missed its desired rate », « collision ahead » et « Controller patience exceeded » : une charge CPU est une hypothèse, non vérifiée ;
+  - relancées sans fenêtre Gazebo (RViz seul) : graines 4, 5, 6 et 7 (voir tableau).
+
+### Tableau par essai
+
+| Stratégie | Seed | % final | % à 300 s | Distance (m) | near_collisions | Statut |
+|---|---|---|---|---|---|---|
+| A | 4 | 59,9 % | 42,8 % | 71,7 | 28 | Valide (avec fenêtres) |
+| A | 5 | 51,1 % | 35,2 % | 68,5 | 26 | Valide (avec fenêtres) |
+| A | 6 | 49,3 % | 33,8 % | 69,7 | 32 | Valide (RViz seul) |
+| B | 5 | 62,1 % | 31,7 % | 72,0 | 0 | Réussi (RViz seul) |
+| B | 6 | 22,1 % | 22,1 % | 37,0 | 2 | Bloqué dès environ 240 s |
+| B | 4 | 41,1 % (faux) | | 175,5 (faux) | 12 | **Invalide** : mesure faussée |
+| B | 7 | 57,0 % (faux) | | 465,6 (faux) | 26 | **Invalide** : mesure faussée |
+| B (fenêtres) | 4 | 19,4 % | | 32,5 | 3 | Bloqué, hors protocole |
+| B (fenêtres) | 5 | 21,9 % | | 34,4 | 0 | Bloqué, hors protocole |
+
+- **B6** : couverture plate à 22,1 % ; log : 1110 « RegulatedPurePursuitController detected collision ahead », 188 « Controller patience exceeded », aucun « Transform data too old ».
+- **B4 et B7 invalides** (`results/invalides/`) : la TF `map -> odom` vue par Nav2 est restée figée (1556 puis 4923 « Transform data too old »), puis la position mesurée a sauté. Les distances (175,5 m et 465,6 m en 600 s, soit bien plus que ce que 0,15 m/s permet, environ 90 m au maximum) et les % finaux ne sont pas des mesures. B4 : environ 16,7 % à 540 s puis un saut ; B7 : environ 13,5 % vers 210 s puis des sauts. Ces deux essais sont **écartés des moyennes mais comptés comme blocages** dans la fiabilité.
+
+### Moyennes
+
+| Ensemble | n | % final | Distance (m) | near_collisions |
+|---|---|---|---|---|
+| A, tous essais valides (8/10 et 12/10) | 6 | 52,2 ± 5,7 % (min 43,3, max 59,9) | 70,4 ± 1,3 | 27,2 ± 4,4 |
+| B, tous essais valides (`summary.md`) | 5 | 43,3 ± 21,8 % | 54,2 ± 19,6 | 5,8 ± 10,8 |
+| B réussis seuls (graines 1, 2, 5) | 3 | 59,1 ± 3,4 % (min 55,4, max 62,1) | 68,1 | 0, 2, 0 |
+
+Écart-type d'échantillon (n-1). Les 3 essais A du 8/10 seuls : 51,0 ± 6,7 % ; les 3 essais A du 12/10 seuls : 53,4 %.
+
+### Fiabilité de B
+
+- Sur 7 lancements **sans fenêtre Gazebo ou conformes au protocole** (graines 1 à 7) : **3 réussis** (1, 2, 5) et **4 blocages ou mesures faussées** (3, 4, 6, 7).
+- Plus **2 blocages avec fenêtres**, hors protocole (graines 4 et 5).
+- Aucun essai A n'a été bloqué (6 sur 6).
+- Les blocages sont de deux types : TF `map -> odom` figée (B3 le 8/10, B4, B7) ou blocage par le contrôleur Nav2 sans TF figée (B6). La cause de fond n'est pas établie.
+
+### Comparaison A et B réussis
+
+- B réussis (59,1 %) contre A (52,2 %) : **+6,9 points** en faveur de B.
+- Les plages se recouvrent : B de 55,4 à 62,1 %, A de 43,3 à 59,9 %. Le meilleur run de A (59,9 %) est à la hauteur de B1 (59,8 %).
+- B réussis atteignent 50 % à 473, 473 et 459 s ; A l'atteint dans 4 essais sur 6 (394, 561, 566 et 590 s).
+- À 300 s, la moyenne de A (32,4 %) est légèrement au-dessus de celle de B réussis (30,9 %, calculée sur 30,5, 30,6 et 31,7 %) : l'avantage de B ne vient qu'en seconde moitié.
+- Distance : environ 70 m dans les deux cas. near_collisions : 0 à 2 pour B réussis contre 21 à 32 pour A (réserves de la section 4 sur ce compteur).
+- **80 % n'est atteint par aucun essai valide.**
+
+### Interprétation (prudente)
+
+- Sur les essais qui fonctionnent, B est légèrement meilleur que A en fin de run, avec de bien moindres near_collisions. L'écart est petit devant la dispersion de A et repose sur 3 runs de B : aucun test statistique n'est proposé.
+- Le constat le plus net est la **fiabilité** : B réussit 3 fois sur 7 dans les conditions du protocole, A 6 fois sur 6. Compter tous les lancements, B (43,3 % en moyenne sur les 5 essais valides) est en dessous de A (52,2 %), et cette moyenne ne compte même pas les deux mesures invalides.
+- Les blocages de B sont plus fréquents le 12/10 (3 sur 4 lancements sans fenêtre : graines 4, 6, 7 en échec, 5 réussi) que le 8/10 (1 sur 3). Cause non établie : charge de la machine, état de WSL ou hasard ne sont pas départagés, aucune expérience ne les isole.
+- Le lancement avec fenêtres semble défavorable à B (2 blocages sur 2), mais cela ne repose que sur 2 essais, et les graines 4 et 5 ont ensuite été bloquées ou faussées aussi sans fenêtre (graine 4 invalide, graine 5 réussie).
+
+### Défaut de mesure découvert
+
+Le `coverage_tracker` ne filtre pas les sauts de position impossibles : quand la localisation saute, distance et couverture sont gonflées (B4 et B7). Un correctif est proposé et **non implémenté** : rejeter une pose dont le déplacement depuis la précédente dépasse une vitesse plausible (par exemple 0,5 m/s). Les essais valides ne sont pas concernés (distances de 62 à 72 m pour 600 s à 0,15 m/s), mais les mesures du 12/10 ont été triées à la main, pas par un filtre.
+
+### Limites propres aux essais du 12/10
+
+- **Conditions pas strictement identiques** : A4 et A5 avec fenêtres Gazebo et RViz, A6 sans fenêtre Gazebo, alors que les essais du 8/10 étaient sans fenêtre. Le mode accéléré dépend de la charge machine, ce qui pourrait jouer ; non vérifié. Les 3 A du 12/10 (53,4 % en moyenne) sont proches de ceux du 8/10 (51,0 %).
+- **Cause des blocages de B non établie** (TF figée ou contrôleur) ; plus fréquents le 12/10, hypothèse de charge non vérifiée.
+- **Tri a posteriori** : B4 et B7 sont écartés des moyennes car la mesure est fausse (distance impossible), pas parce que le résultat déplaît ; ils sont comptés comme échecs de fiabilité.
+- **Défaut du tracker** (ci-dessus) non corrigé.
+- Toujours une seule pièce, odométrie simulée, et peu de runs (6 et 5).
+- Captures : `results/figures/sim_RANDOM_{5,6}_rviz_{t300,fin}.png`, `sim_RANDOM_5_gazebo_{t300,fin}.png`, `sim_BOUSTROPHEDON_{4,5,6,7}_rviz_{t300,fin}.png` (pas de capture pour A4). Les figures `coverage_vs_time*.png` ont été régénérées par `scripts/plot_results.py`.
 
 ## 7. Robot réel (séance du 2026-10-09)
 

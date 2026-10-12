@@ -757,3 +757,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : un plan par banc, toujours dans le même ordre : simulation (A, B, conclusion), robot réel (A, B avec le problème Nav2 et le suiveur, conclusion), jumeau numérique (pourquoi, A, B), puis conclusion générale. 22 slides, sommaire en 6 parties. Nouvelles figures par stratégie (`scripts/plot_slides.py`, `scripts/plot_couverture.py`).
 - **Justification** : une structure répétée est plus facile à suivre ; chaque conclusion partielle prépare le banc suivant.
 - **Résultat-leçon** : le plan d'une présentation doit suivre les questions du public, pas l'ordre de nos découvertes.
+
+### 2026-10-12 · Essais de simulation complémentaires et vraies captures
+
+- **Contexte** : plus de données sur la pièce à piliers, et de vraies captures RViz à la place des cartes reconstruites.
+- **Options envisagées** : lancer avec toutes les fenêtres (Gazebo et RViz) ; ou Gazebo sans fenêtre et RViz seul, comme le protocole officiel (sans fenêtre).
+- **Choix** : A graines 4 et 5 avec fenêtres, A6 et B4 à B7 sans fenêtre Gazebo, RViz seul (vue centrée sur la pièce). B4 et B5 lancés d'abord avec fenêtres : bloqués (19,4 et 21,9 %), log plein de « Control loop missed its desired rate » ; rangés hors protocole dans `results/fenetres/`.
+- **Justification** : ne pas mélanger des conditions différentes pour B, sensible à la charge du processeur (déjà vu en T0).
+- **Résultat-leçon** : A : 6 essais entre 43,3 et 59,9 % (moyenne 52,2 %). B : 3 réussis sur 7 (59,8 / 55,4 / 62,1 %), 4 blocages : graine 3 (8/10) et 6 à 17 et 22 % ; graines 4 et 7 bloquées par une TF map → odom figée, puis la position a sauté quand la localisation a repris. Notre `coverage_tracker` a compté ces sauts : 175 m et 465 m « parcourus », pourcentages faux (41 et 57 %). Ces deux CSV sont dans `results/invalides/`, écartés des moyennes mais comptés comme blocages. Leçon : la mesure aussi doit rejeter l'impossible (perspective P12) ; et un essai qui « réussit trop bien » doit être vérifié par une grandeur physique (ici la distance).

@@ -365,6 +365,8 @@ Monde Gazebo `zone_reelle.world` généré à partir de la carte réelle (96 bo�
 
 ### 7.1 Simulation (`turtlebot3_world`, 600 s, départ (-2,0 ; -0,5))
 
+> **Mise à jour du 12/10 (essais complémentaires)** : A compte maintenant 6 essais (54,4 / 55,5 / 43,3 / 59,9 / 51,1 / 49,3 %, moyenne 52,2 %). B compte 7 essais lancés dans les conditions du protocole : 3 réussis (59,8 / 55,4 / 62,1 %, moyenne 59,1 %) et 4 bloqués (graines 3 et 6 à 17 et 22 % ; graines 4 et 7 bloquées puis mesure faussée par des sauts de position, écartées des moyennes). B réussi passe devant A après environ 7 min. Les slides 9 à 11 utilisent ces chiffres et de vraies captures RViz. Détail : `docs/RESULTATS.md`, section 6 bis.
+
 | Stratégie | Seed | % final | % à 300 s | Distance (m) | near_collisions |
 |---|---|---|---|---|---|
 | A | 1 | 54,4 | 24,8 | 71,9 | 24 |
@@ -721,6 +723,9 @@ ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/
 ---
 
 ## 14. Les chiffres à retenir
+
+- **Simulation, état final (12/10)** : A 52 % (6 essais, 43 à 60 %) ; B réussi 59 % (3 essais), B bloqué 4 fois sur 7 ; 80 % jamais atteint.
+- **Bug de mesure trouvé le 12/10** : le nœud de mesure accepte des sauts de position (465 m « roulés » en 10 min sur un essai bloqué). Correctif proposé : ignorer une position qui implique plus de 0,5 m/s.
 
 **Simulation (600 s)** : A 51,0 ± 6,7 %, B 44,1 ± 23,4 % (57,6 % sur les 2 runs normaux), 80 % jamais atteint, meilleur run 59,8 %. near_collisions : A 25,7 en moyenne, B 0 et 2. T0 vers T5 : 33,2 % vers 59,7 % à 600 s. 5564 cellules (13,9 m²), 112 waypoints.
 

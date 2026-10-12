@@ -48,15 +48,25 @@ def finish(ax, xlabel, xmax):
 
 
 def simulation():
+    """A : moyenne de tous les essais ; B : moyenne des essais réussis, essais bloqués à part.
+
+    Un essai B est dit bloqué si sa couverture finale reste sous 30 % (moitié de la plage des
+    essais réussis, 55 à 62 %) ; les mesures faussées par des sauts de position sont dans
+    results/invalides/ et ne sont pas lues ici.
+    """
     grid = np.linspace(0, 600, 601)
-    a = np.mean([on_grid(p, grid) for p in sorted(glob.glob(RES + '/RANDOM_*.csv'))], axis=0)
-    b_paths = sorted(glob.glob(RES + '/BOUSTROPHEDON_*.csv'))
-    b12 = np.mean([on_grid(p, grid) for p in b_paths[:2]], axis=0)
-    b3 = on_grid(b_paths[2], grid)
+    a_runs = [on_grid(p, grid) for p in sorted(glob.glob(RES + '/RANDOM_*.csv'))]
+    b_runs = [on_grid(p, grid) for p in sorted(glob.glob(RES + '/BOUSTROPHEDON_*.csv'))]
+    b_ok = [r for r in b_runs if r[-1] >= 30.0]
+    b_bloque = [r for r in b_runs if r[-1] < 30.0]
     fig, ax = plt.subplots(figsize=(16, 9))
-    ax.plot(grid / 60, a, color=ORANGE, linewidth=4, label='A aléatoire (moyenne de 3 essais)')
-    ax.plot(grid / 60, b12, color=BLUE, linewidth=4, label='B planifié (essais 1 et 2)')
-    ax.plot(grid / 60, b3, color=BLUE, linewidth=3, linestyle='--', alpha=0.5, label='B essai 3 (bloqué)')
+    ax.plot(grid / 60, np.mean(a_runs, axis=0), color=ORANGE, linewidth=4,
+            label=f'A aléatoire (moyenne de {len(a_runs)} essais)')
+    ax.plot(grid / 60, np.mean(b_ok, axis=0), color=BLUE, linewidth=4,
+            label=f'B planifié (moyenne des {len(b_ok)} essais réussis)')
+    for k, r in enumerate(b_bloque):
+        ax.plot(grid / 60, r, color=BLUE, linewidth=3, linestyle='--', alpha=0.5,
+                label=f'B bloqué ({len(b_bloque)} essais)' if k == 0 else None)
     finish(ax, 'Temps (min)', 10)
     ax.legend(loc='upper left', frameon=False)
     fig.tight_layout()

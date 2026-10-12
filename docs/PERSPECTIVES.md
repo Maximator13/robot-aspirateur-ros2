@@ -126,3 +126,10 @@ Protocole de mesure commun : même monde, même départ, 600 s simulées, même 
 
 - Aucune promesse de « couverture complète » : en simulation (600 s), B n'a pas dépassé 60 % sur un run et 80 % n'est atteint par aucune stratégie. Sur la petite zone réelle, B atteint 80 % en 125 et 134 s (2 runs).
 - Pas d'apprentissage par renforcement, hors périmètre du temps et des sources vérifiées.
+
+## P12. Filtrer les sauts de position dans la mesure
+
+- **Constat (12/10)** : sur deux essais B bloqués, la position a sauté de plusieurs mètres quand la localisation a repris ; le `coverage_tracker` a compté ces sauts (jusqu'à 465 m « parcourus » en 600 s, alors que 0,15 m/s n'en permet que 90). Pourcentage gonflé, essais écartés.
+- **Incrément** : ignorer une pose si la vitesse apparente depuis la précédente dépasse 0,5 m/s, et compter ces rejets dans `/coverage_status`.
+- **Mesure de succès** : rejouer les rosbags des essais B4 et B7 (`results/bags/`) : distance plausible (90 m au plus) et couverture qui reste figée pendant le blocage.
+- **Effort estimé** : 0,5 jour (estimation, non mesurée). Test pytest sur une suite de poses avec un saut.
