@@ -607,31 +607,35 @@ Dans cette fiche, « Maxime » désigne l'étudiant principal.
 | Slide | Titre | Durée | Qui | Section de la fiche |
 |---|---|---|---|---|
 | 1 | Titre et question | 0:10 | Binôme | |
-| 2 | Sommaire | 0:15 | Binôme | |
+| 2 | Sommaire (6 parties) | 0:15 | Binôme | |
 | 3 | Le problème (photo du robot) | 0:20 | Binôme | 1 |
-| 4 | Ce qui existe | 0:35 | Binôme | 9 (tableau) |
-| 5 | Deux stratégies (algorigrammes) | 0:45 | Maxime | 4.1 et 4.2 |
+| 4 | Ce qui existe | 0:30 | Binôme | 9 (tableau) |
+| 5 | Deux stratégies (algorigrammes) | 0:40 | Maxime | 4.1 et 4.2 |
 | 6 | Schéma de principe A (cadre = aspi_random.launch.py) | 0:30 | Maxime | 3 |
-| 7 | Schéma de principe B (cadre = aspi_planned.launch.py) | 0:40 | Maxime | 3 |
-| 8 | Essai 1 : la pièce simulée (5,5 × 5 m, 9 piliers) et le plan de B | 0:25 | Binôme | 4.2 et 5 |
-| 9 | Ce que A et B ont vraiment couvert en 10 min (cartes) | 0:30 | Binôme | 7.1 |
-| 10 | Sur 3 essais : courbes en fonction du temps | 0:30 | Binôme | 4.3 et 7.1 |
-| 11 | Pourquoi si peu d'écart (70 m : distance roulée par B en 10 min) | 0:40 | Maxime | 5 (borne optimiste) et 6 |
-| 12 | Essai 2 : le terrain réel (photo, carte, RViz) | 0:20 | Maxime | 6 |
-| 13 | Robot réel : Nav2 conduit avec une position périmée | 0:35 | Maxime | 8, 6 |
-| 14 | Robot réel : notre suiveur (cadre = aspi_real_follow.launch.py) | 0:35 | Maxime | 4.5 |
-| 15 | Essai 2 : résultat réel (photo) | 0:45 | Maxime | 7.2 |
-| 16 | Essai 3 : jumeau numérique (vidéo Gazebo) | 0:35 | Maxime | 7.3 |
-| 17 | Limites | 0:25 | Binôme | 9 |
-| 18 | Conclusion et perspectives | 0:35 | Binôme | 9 |
+| 7 | Schéma de principe B (cadre = aspi_planned.launch.py) | 0:35 | Maxime | 3 |
+| 8 | Simulation : la pièce (5,5 × 5 m) et le plan de B | 0:20 | Binôme | 4.2 et 5 |
+| 9 | Simulation, A : carte de ce qu'il a couvert | 0:25 | Binôme | 7.1 |
+| 10 | Simulation, B : carte de ce qu'il a couvert, essai bloqué | 0:25 | Binôme | 7.1 |
+| 11 | Simulation : conclusion (le plan est bon, Nav2 le ralentit) | 0:35 | Maxime | 5 (borne optimiste) et 6 |
+| 12 | Robot réel : le terrain (photo, carte, RViz) | 0:15 | Maxime | 6 |
+| 13 | Robot réel, A : il plafonne vers 74 % | 0:25 | Maxime | 7.2 |
+| 14 | Robot réel, B : le problème Nav2 (position datée de 27 s) | 0:30 | Maxime | 8, 6 |
+| 15 | Robot réel, B : notre suiveur (cadre = aspi_real_follow.launch.py) | 0:30 | Maxime | 4.5 |
+| 16 | Robot réel, B : résultat (vidéo) | 0:25 | Maxime | 7.2 |
+| 17 | Robot réel : conclusion (B gagne nettement) | 0:30 | Maxime | 7.2 |
+| 18 | Jumeau numérique : pourquoi et comment (vidéo Gazebo) | 0:20 | Maxime | 7.3 |
+| 19 | Jumeau, A : même distance, il couvre plus | 0:25 | Maxime | 7.3 |
+| 20 | Jumeau, B : le suiveur confirme, Nav2 bloque encore | 0:25 | Maxime | 7.3 |
+| 21 | Limites | 0:25 | Binôme | 9 |
+| 22 | Conclusion générale et perspectives | 0:35 | Binôme | 9 |
 
-Temps de parole : binôme 3 min 45 ; Maxime 5 min 25. Total 9 min 10 : les notes d'orateur sont un peu plus longues, il faut les résumer à l'oral.
+Temps de parole : binôme 3 min 25 ; Maxime 6 min 05. Total 9 min 30 : c'est serré, résumer les notes d'orateur et ne pas s'attarder sur les slides 8, 12 et 18.
 
 **Ce qu'est le suiveur (à savoir expliquer)** : `coverage_follower` est un nœud ROS écrit par l'équipe. Il reçoit le plan (`/coverage_path`) et la position du robot (TF, odométrie seule), et publie directement `/cmd_vel`. Pour chaque point : s'il est mal orienté (plus de 20°), il tourne sur place ; sinon il avance en corrigeant son cap ; à moins de 8 cm, il passe au point suivant. Pause si obstacle à moins de 15 cm, point sauté après 40 s, arrêt si plus de LiDAR ou de position depuis 1 s.
 
-**Les 27 s de la slide 13 (à savoir expliquer)** : Nav2 ne fait pas attendre le robot 27 s. La position qu'il reçoit d'AMCL (transformation map → odom) porte une date vieille de 27 s : il conduit avec une position périmée, d'où les faux « but atteint ». L'origine exacte du retard (horloge, Wi-Fi) n'a pas été trouvée.
+**Les 27 s de la slide 14 (à savoir expliquer)** : Nav2 ne fait pas attendre le robot 27 s. La position qu'il reçoit d'AMCL (transformation map → odom) porte une date vieille de 27 s : il conduit avec une position périmée, d'où les faux « but atteint ». L'origine exacte du retard (horloge, Wi-Fi) n'a pas été trouvée.
 
-Points de vigilance pour le binôme : les slides 9 et 10 portent le résultat de simulation et doit expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 17 dit les limites sans les minimiser.
+Points de vigilance pour le binôme : les slides 9 et 10 portent le résultat de simulation (cartes de ce que A et B ont couvert) et doivent expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 21 dit les limites sans les minimiser.
 
 Pendant les questions : répondez à celles marquées « Binôme OK ». Pour les autres, laissez l'étudiant répondre, puis complétez si besoin.
 
@@ -739,5 +743,5 @@ ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/
 - **Cause du gel de TF (B3)** et **cause du blocage de Nav2 sur le robot réel** : non établies.
 - **Existence d'un rosbag d'un run réel** : le journal du 9/10 note leur absence ; à confirmer.
 - **Schéma système contre `rqt_graph`** : l'exigence du brief n'a pas été revérifiée depuis les dernières modifications.
-- **Photo ou vidéo du robot réel** pour les slides 3 (photo du robot), 12 (photo de la zone) et 15 (photo ou vidéo de l'essai réel) : à fournir par l'étudiant.
+- **Photo ou vidéo du robot réel** pour les slides 3 (photo du robot), 12 (photo de la zone) et 16 (vidéo de l'essai réel de B) : à fournir par l'étudiant.
 - **Un seul fichier de référence pour le jumeau** : `docs/JOUR_ROBOT.md` n'a pas été relu pour cette fiche.

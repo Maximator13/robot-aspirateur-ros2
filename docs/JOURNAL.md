@@ -749,3 +749,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : `scripts/plot_couverture.py` rejoue le rosbag de l'essai n°1 de A et de B (positions `/odom` ramenées au repère map) avec le même calcul que le tracker. La zone à couvrir est en beige, la zone couverte en couleur, avec une échelle de 1 m (pièce d'environ 5,5 × 5,1 m).
 - **Justification** : une image de ce qui a été nettoyé se lit sans explication.
 - **Résultat-leçon** : reconstruction vérifiée contre les CSV (54,6 % contre 54,4 % pour A, 59,6 % contre 59,8 % pour B). On voit A traverser la pièce en tous sens, et B couvrir en bandes depuis le bas sans finir le haut : en 10 min il roule 70 m sur les 92 m de son plan. Leçon : les rosbags enregistrés pendant le protocole permettent de produire après coup des preuves visuelles.
+
+### 2026-10-12 · Diaporama organisé par banc d'essai
+
+- **Contexte** : à partir des essais, l'enchaînement mélangeait simulation, robot réel et jumeau ; le public s'y perdait.
+- **Options envisagées** : un fil « enquête » (problème → cause → solution) ou un plan par banc d'essai.
+- **Choix** : un plan par banc, toujours dans le même ordre : simulation (A, B, conclusion), robot réel (A, B avec le problème Nav2 et le suiveur, conclusion), jumeau numérique (pourquoi, A, B), puis conclusion générale. 22 slides, sommaire en 6 parties. Nouvelles figures par stratégie (`scripts/plot_slides.py`, `scripts/plot_couverture.py`).
+- **Justification** : une structure répétée est plus facile à suivre ; chaque conclusion partielle prépare le banc suivant.
+- **Résultat-leçon** : le plan d'une présentation doit suivre les questions du public, pas l'ordre de nos découvertes.

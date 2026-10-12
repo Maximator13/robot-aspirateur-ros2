@@ -108,9 +108,41 @@ def jumeau():
     fig.savefig(OUT + '/slides_jumeau.png', dpi=100)
 
 
+def curves(series, xmax, out_name, legend_loc='lower right'):
+    """Courbes simples : series = [(chemin CSV, libellé, couleur, style), ...]."""
+    fig, ax = plt.subplots(figsize=(16, 9))
+    for path, label, color, style in series:
+        t, c, _ = read(path)
+        keep = t <= xmax
+        ax.plot(t[keep], c[keep], color=color, linewidth=4, linestyle=style, label=label)
+    finish(ax, 'Temps (s)', xmax)
+    ax.legend(loc=legend_loc, frameon=False)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, out_name), dpi=100)
+
+
+def par_strategie():
+    """Une figure par stratégie et par banc (robot réel, jumeau)."""
+    R = RES + '/robot_reel/'
+    J = RES + '/jumeau/'
+    curves([(R + 'RANDOM_1_20261012-105211.csv', 'A, essai 1', ORANGE, '-'),
+            (R + 'RANDOM_3_20261012-105805.csv', 'A, essai 2', ORANGE, ':')], 300, 'slides_reel_A.png')
+    curves([(R + 'BOUSTROPHEDON_1_20261012-103146.csv', 'B, essai 1', BLUE, '-'),
+            (R + 'BOUSTROPHEDON_2_20261012-110402.csv', 'B, essai 2 (arrêté, trajet fini)', BLUE, ':')],
+           300, 'slides_reel_B.png')
+    curves([(R + 'RANDOM_1_20261012-105211.csv', 'A robot réel, essai 1', ORANGE, '-'),
+            (R + 'RANDOM_3_20261012-105805.csv', 'A robot réel, essai 2', ORANGE, ':'),
+            (J + 'RANDOM_1_20261012-112603.csv', 'A jumeau Gazebo', GREY, '-')], 300, 'slides_jumeau_A.png')
+    curves([(R + 'BOUSTROPHEDON_1_20261012-103146.csv', 'B suiveur, robot réel', BLUE, '-'),
+            (J + 'BOUSTROPHEDON_1_20261012-113623.csv', 'B suiveur, jumeau Gazebo', GREY, '-'),
+            (J + 'BOUSTROPHEDON_2_20261012-114404.csv', 'B avec Nav2, jumeau Gazebo', GREY, '--')],
+           300, 'slides_jumeau_B.png')
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     simulation()
     reel()
     jumeau()
+    par_strategie()
     print('figures écrites dans', OUT)

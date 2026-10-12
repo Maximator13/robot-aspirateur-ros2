@@ -3,7 +3,7 @@
 Rejoue un rosbag du protocole : positions /odom -> repère map, puis même marquage que le
 coverage_tracker (disque de 2 cellules, seulement sur le masque atteignable de planning.py).
 Le % recalculé est comparé au CSV officiel pour vérifier la reconstruction.
-Écrit results/figures/couverture_A_B.png.
+Écrit results/figures/couverture_A_B.png, couverture_A.png et couverture_B.png.
 Usage (ROS sourcé) : python3 plot_couverture.py
 """
 import glob
@@ -95,7 +95,12 @@ def main():
         for s in ax.spines.values():
             s.set_visible(False)
     fig.tight_layout()
-    fig.savefig(os.path.join(WS, 'results', 'figures', 'couverture_A_B.png'), dpi=100)
+    out = os.path.join(WS, 'results', 'figures')
+    fig.savefig(os.path.join(out, 'couverture_A_B.png'), dpi=100)
+    fig.canvas.draw()
+    for ax, name in zip(axes, ('couverture_A.png', 'couverture_B.png')):  # une image par stratégie
+        box = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
+        fig.savefig(os.path.join(out, name), dpi=100, bbox_inches=box)
 
 
 if __name__ == '__main__':
