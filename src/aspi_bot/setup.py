@@ -31,6 +31,7 @@ setup(
             'coverage_tracker = aspi_bot.coverage_tracker_node:main',
             'coverage_planner = aspi_bot.coverage_planner_node:main',
             'coverage_executor = aspi_bot.coverage_executor_node:main',
+            'coverage_follower = aspi_bot.coverage_follower_node:main',
         ],
     },
 )

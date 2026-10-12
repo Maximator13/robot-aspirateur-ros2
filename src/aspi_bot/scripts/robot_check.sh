@@ -14,23 +14,30 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$ROBOT" true 2>/dev/null; then
 fi
 
 echo "== 0b. Heure du robot (pas d'horloge sauvegardée : elle repart en arrière à chaque extinction)"
-# Écart en millisecondes (Nav2 refuse des données de plus de ~1 s par rapport à l'heure du PC)
-ecart_ms() {
+# Écart SIGNÉ (PC - robot) en ms, mesuré au milieu de l'aller-retour SSH (latence compensée)
+ecart_signe_ms() {
   local t0 r t1
   t0=$(date +%s%3N); r=$(ssh "$ROBOT" date +%s%3N); t1=$(date +%s%3N)
-  local e=$(( (t0 + t1) / 2 - r )); echo ${e#-}
+  echo $(( (t0 + t1) / 2 - r ))
 }
-ECART=$(ecart_ms)
-echo "   écart PC - robot : ${ECART} ms"
-if [ "$ECART" -gt 300 ]; then
-  # Le mot de passe est lu AVANT de prendre l'heure du PC : sinon le temps de frappe
-  # décale le robot de plusieurs secondes (et le script redemande à chaque fois).
-  # L'heure envoyée est prise avant l'établissement de la connexion SSH : retard d'environ
-  # un aller-retour (100-500 ms en Wi-Fi), visible sur la ligne « nouvel écart ».
-  read -rs -p "   heure fausse. Mot de passe sudo du robot : " PW; echo
-  echo "$PW" | ssh "$ROBOT" "sudo -S -p '' date -s '$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)'" >/dev/null
+abs() { echo ${1#-}; }
+E=$(ecart_signe_ms)
+[ -n "$E" ] || { echo "mesure d'heure impossible (SSH ?)"; exit 1; }
+echo "   écart PC - robot : $(abs $E) ms"
+if [ "$(abs $E)" -gt 100 ]; then
+  # Mot de passe lu une fois, AVANT toute mesure (le temps de frappe ne fausse rien).
+  read -rs -p "   heure à corriger. Mot de passe sudo du robot : " PW; echo
+  for essai in 1 2 3; do
+    E=$(ecart_signe_ms)
+    # Correction relative appliquée PAR le robot à sa propre horloge : la durée du trajet
+    # SSH n'entre plus dans l'heure réglée (contrairement à l'envoi d'une heure absolue).
+    echo "$PW" | ssh "$ROBOT" "sudo -S -p '' date -s @\$(python3 -c 'import time; print(f\"{time.time() + $E / 1000:.3f}\")')" >/dev/null
+    E=$(ecart_signe_ms)
+    echo "   essai $essai : nouvel écart $(abs $E) ms"
+    [ "$(abs $E)" -le 100 ] && break
+  done
   unset PW
-  echo "   nouvel écart : $(ecart_ms) ms (doit être < 300)"
+  [ "$(abs $E)" -le 100 ] || echo "   ATTENTION : écart encore > 100 ms (latence Wi-Fi irrégulière ?)"
 fi
 
 echo "== 1. Arrêt des anciens lancements sur le robot"
