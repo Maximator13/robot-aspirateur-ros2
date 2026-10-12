@@ -597,31 +597,34 @@ Il a permis de prouver que la TF était publiée à 5 Hz par AMCL pendant le gel
 
 ## 12. Répartition proposée de la présentation à deux
 
-Le diaporama compte 15 slides, simplifiées, sans code. Chaque slide a des notes d'orateur (ce qu'il faut dire, durée, qui parle) : les lire, elles complètent cette fiche. La numérotation n'est pas celle de `PLAN_SOUTENANCE.md`.
+Le diaporama compte 16 slides principales et 4 annexes (A1 réglages de Nav2, A2 bugs et leçons, A3 tous les chiffres, A4 références), sans code. Les annexes ne sont pas présentées : elles servent à répondre aux questions. Chaque slide a des notes d'orateur (ce qu'il faut dire, durée, qui parle) : les lire, elles complètent cette fiche.
+
+**Le fil conducteur** : « Planifier sur une carte aide-t-il à mieux aspirer ? » Hypothèse : oui. Essai 1 (simulation) : B passe devant A quand il ne se bloque pas, mais l'écart est faible ; un robot parfait qui suivrait notre plan ferait 76 % là où Nav2 fait 60 % : le plan est bon, l'exécutant (Nav2) perd du temps. Essai 2 (robot réel) : Nav2 ne fait pas avancer le robot (faux succès) ; on garde le plan et on le fait suivre par un conducteur simple ; B couvre alors 80 % en 2 min, A jamais. Essai 3 (jumeau) : la zone réelle rejouée dans Gazebo donne les mêmes distances, ce qui rend le résultat réel crédible. Réponse : planifier aide, à condition d'un exécutant fiable.
 
 Dans cette fiche, « Maxime » désigne l'étudiant principal.
 
 | Slide | Titre | Durée | Qui | Section de la fiche |
 |---|---|---|---|---|
-| 1 | Titre | 0:15 | Binôme | |
-| 2 | Problème métier (photo du robot) | 0:20 | Binôme | 1 |
-| 3 | Solutions existantes | 0:40 | Binôme | 9 (tableau) |
-| 4 | Deux stratégies (algorigrammes) | 0:50 | Maxime | 4.1 et 4.2 |
-| 5 | Schéma de principe A | 0:35 | Maxime | 3 |
-| 6 | Schéma de principe B | 0:45 | Maxime | 3 |
-| 7 | Démo (vidéo + capture RViz) | 0:30 | Maxime | |
-| 8 | Résultats en simulation | 0:50 | Binôme | 4.3 et 7.1 |
-| 9 | Démarche : régler B | 0:40 | Maxime | 6 |
-| 10 | Trois bugs, trois leçons | 0:45 | Maxime | 8 |
-| 11 | Résultats sur le robot réel (photo) | 1:00 | Maxime | 7.2 |
-| 12 | Impasse Nav2 sur le robot réel | 0:50 | Maxime | 8, 4.5 |
-| 13 | Jumeau numérique | 0:50 | Maxime | 7.3 |
-| 14 | Limites | 0:30 | Binôme | 9 |
-| 15 | Perspectives et conclusion | 0:40 | Binôme | 9 |
+| 1 | Titre et question | 0:10 | Binôme | |
+| 2 | Sommaire | 0:15 | Binôme | |
+| 3 | Le problème (photo du robot) | 0:20 | Binôme | 1 |
+| 4 | Ce qui existe | 0:40 | Binôme | 9 (tableau) |
+| 5 | Deux stratégies (algorigrammes) | 0:50 | Maxime | 4.1 et 4.2 |
+| 6 | Schéma de principe A | 0:35 | Maxime | 3 |
+| 7 | Schéma de principe B | 0:45 | Maxime | 3 |
+| 8 | Démo (vidéo + capture RViz) | 0:30 | Maxime | |
+| 9 | Essai 1 : simulation | 0:40 | Binôme | 4.3 et 7.1 |
+| 10 | Pourquoi si peu d'écart | 0:45 | Maxime | 5 (borne optimiste) et 6 |
+| 11 | Robot réel : le problème Nav2 | 0:40 | Maxime | 8, 6 |
+| 12 | Robot réel : notre suiveur | 0:40 | Maxime | 4.5 |
+| 13 | Essai 2 : résultat réel (photo) | 0:50 | Maxime | 7.2 |
+| 14 | Essai 3 : jumeau numérique | 0:40 | Maxime | 7.3 |
+| 15 | Limites | 0:30 | Binôme | 9 |
+| 16 | Conclusion et perspectives | 0:40 | Binôme | 9 |
 
-Temps de parole : binôme 0:15 + 0:20 + 0:40 + 0:50 + 0:30 + 0:40 = 3 min 15 ; Maxime 0:50 + 0:35 + 0:45 + 0:30 + 0:40 + 0:45 + 1:00 + 0:50 + 0:50 = 6 min 45. Total 10 min : si on dépasse, raccourcir la slide 9.
+Temps de parole : binôme 3 min 15 ; Maxime 6 min 15. Total 9 min 30, soit 30 s de marge. Si on dépasse, raccourcir les slides 4 et 10.
 
-Points de vigilance pour le binôme : la slide 8 porte le résultat de simulation et doit expliquer que le même nœud mesure A et B (section 4.3) ; la slide 3 est l'état de l'art (références dans `docs/ETAT_DE_L_ART.md`) ; la slide 14 dit les limites sans les minimiser.
+Points de vigilance pour le binôme : la slide 9 porte le résultat de simulation et doit expliquer que le même nœud mesure A et B (section 4.3) ; la slide 4 est l'état de l'art (références en annexe A4) ; la slide 15 dit les limites sans les minimiser.
 
 Pendant les questions : répondez à celles marquées « Binôme OK ». Pour les autres, laissez l'étudiant répondre, puis complétez si besoin.
 
@@ -729,5 +732,5 @@ ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/
 - **Cause du gel de TF (B3)** et **cause du blocage de Nav2 sur le robot réel** : non établies.
 - **Existence d'un rosbag d'un run réel** : le journal du 9/10 note leur absence ; à confirmer.
 - **Schéma système contre `rqt_graph`** : l'exigence du brief n'a pas été revérifiée depuis les dernières modifications.
-- **Photo ou vidéo du robot réel** pour les slides 2 (photo du robot), 7 (vidéo de démo) et 11 (photo dans la zone) : à fournir par l'étudiant.
+- **Photo ou vidéo du robot réel** pour les slides 3 (photo du robot), 8 (vidéo de démo) et 13 (photo dans la zone) : à fournir par l'étudiant.
 - **Un seul fichier de référence pour le jumeau** : `docs/JOUR_ROBOT.md` n'a pas été relu pour cette fiche.

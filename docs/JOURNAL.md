@@ -725,3 +725,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : un schéma de principe par stratégie (rectangle = nœud, pilule = topic, flèche = sens des messages), une slide de démo, des emplacements pour les photos et vidéos du robot réel, et moins de chiffres par slide (le détail passe dans les notes d'orateur). 15 slides, aucun code ni chemin de fichier.
 - **Justification** : chaque membre doit pouvoir expliquer chaque élément affiché ; un schéma lisible vaut mieux qu'un schéma exhaustif.
 - **Résultat-leçon** : la fiche du binôme suit la nouvelle numérotation. Leçon : n'afficher que ce qu'on sait expliquer, garder le reste pour les questions.
+
+### 2026-10-12 · Fil conducteur du diaporama et livrables en PDF
+
+- **Contexte** : retours sur le diaporama : pas de fil conducteur clair, graphiques surchargés, impasse Nav2 et sa solution mal expliquées, A « meilleur » dans Gazebo incompris.
+- **Options envisagées** : retoucher slide par slide, ou reconstruire autour d'une question unique.
+- **Choix** : une question (« planifier aide-t-il à mieux aspirer ? »), un sommaire en 4 parties, trois essais racontés comme une enquête (simulation : le plan est bon mais Nav2 perd du temps ; robot réel : Nav2 bloque, un suiveur simple débloque ; jumeau : vérification). Figures épurées générées par `scripts/plot_slides.py` (une idée par figure). Détails techniques en annexes. Documents livrés en PDF dans `livrables/`.
+- **Justification** : 10 min de présentation ; le jury doit suivre un raisonnement, les détails servent aux 10 min de questions.
+- **Résultat-leçon** : la comparaison « robot parfait 76 % contre Nav2 60 % à distance égale » explique à elle seule pourquoi l'écart A/B est faible en simulation. Leçon : une présentation se construit autour d'une question et de sa réponse, pas autour de la chronologie.
