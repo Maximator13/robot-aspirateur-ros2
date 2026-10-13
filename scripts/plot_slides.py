@@ -67,6 +67,8 @@ def simulation():
     for k, r in enumerate(b_bloque):
         ax.plot(grid / 60, r, color=BLUE, linewidth=3, linestyle='--', alpha=0.5,
                 label=f'B bloqué ({len(b_bloque)} essais)' if k == 0 else None)
+    ax.axvline(7, color=GREY, linewidth=2, linestyle='--')   # B réussi passe devant A vers 7 min
+    ax.text(7.1, 3, '7 min : B passe devant', color=GREY, fontsize=18)
     finish(ax, 'Temps (min)', 10)
     ax.legend(loc='upper left', frameon=False)
     fig.tight_layout()

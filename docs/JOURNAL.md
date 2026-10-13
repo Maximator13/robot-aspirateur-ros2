@@ -772,3 +772,10 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : toutes les slides sur fond blanc ; annexes remplacées par quatre algorigrammes (random_walker, coverage_planner, coverage_follower, coverage_tracker), une slide bugs et leçons en langage simple, et les références. Les chiffres détaillés restent dans `docs/RESULTATS.md`.
 - **Justification** : les annexes servent à répondre aux questions « comment ça marche ? » : un algorigramme y répond mieux qu'un tableau.
 - **Résultat-leçon** : chaque algorigramme reprend `docs/ALGORIGRAMMES.md` en langage courant ; aucune ligne de code dans le diaporama.
+
+### 2026-10-13 · Relecture du diaporama slide par slide
+
+- **Contexte** : commentaires de l'étudiant sur chaque slide (phrases inutiles, termes non définis, légendes incohérentes, résultats présentés avec trop d'assurance).
+- **Choix** : phrases de bas de slide retirées ou mises en puces ; CCPP écrit en toutes lettres ; état de l'art avec une colonne « pourquoi » ; « le juge » remplacé par « coverage_tracker » ; « conducteur » remplacé par « Nav2, le programme qui conduit le robot de point en point » ; AMCL et les 27 s expliqués en trois étapes ; LiDAR tourné expliqué par l'odométrie seule ; écarts possibles du suiveur mis en avant ; résultat réel présenté comme « à confirmer » (2 essais, position par les roues) ; trait à 7 min sur la courbe de simulation.
+- **Justification** : chaque mot affiché doit pouvoir être expliqué par les deux membres du binôme.
+- **Résultat-leçon** : un résultat favorable sur 2 essais se présente avec ses réserves sur la slide elle-même, pas seulement dans les notes.

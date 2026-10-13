@@ -762,6 +762,12 @@ ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/
 
 ---
 
+
+**Trois questions que le diaporama fait naître (réponses prêtes)**
+- *Pourquoi le LiDAR est-il tourné par rapport aux murs sur la capture RViz du robot réel (slide 12) ?* Sur le vrai robot, nous n'avons pas utilisé AMCL : la position vient des roues seules. Le robot n'est jamais posé exactement dans le même angle que pendant la cartographie, et les roues glissent un peu à chaque rotation sur place. Le LiDAR voit les vrais murs, mais il est dessiné depuis une position un peu fausse, donc il apparaît tourné. 3° d'erreur font environ 5 cm d'écart à 1 m.
+- *C'est quoi AMCL, et pourquoi 27 s (slide 14) ?* AMCL est l'outil de localisation du cours : il compare ce que voit le LiDAR à la carte et en déduit où est le robot. Chaque position porte l'heure de son calcul. Sur le vrai robot, celle que recevait Nav2 avait été calculée 27 s plus tôt : Nav2 croyait le robot là où il était 27 s avant, et disait « arrivé » sans que le robot ait bougé.
+- *Pourquoi pas la spirale, l'arbre couvrant ou opennav_coverage (slide 4) ?* Spirale : chaque obstacle la casse, et la pièce a 9 piliers. Arbre couvrant : découpe en grandes cases et tour de l'arbre, beaucoup de virages et plus de code. opennav_coverage : prévu pour les champs agricoles, version ROS 2 Humble incertaine.
+
 ## 14. Les chiffres à retenir
 
 - **Simulation, état final (12/10)** : A 52 % (6 essais, 43 à 60 %) ; B réussi 59 % (3 essais), B bloqué 4 fois sur 7 ; 80 % jamais atteint.
