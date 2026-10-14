@@ -1,19 +1,3 @@
-"""Stratégie A sur le VRAI TurtleBot3 (pas de Gazebo).
-
-Le robot exécute `turtlebot3_bringup robot.launch.py` (via SSH) : il publie /scan, /odom et la TF
-odom -> base_footprint. Ce launch tourne sur le PC : random_walker + coverage_tracker + RViz,
-et la localisation qui sert UNIQUEMENT à la mesure (le robot n'utilise pas la carte).
-
-Localisation pour la mesure (argument `localization`) :
-  amcl   (défaut) : map_server + AMCL, pose initiale (0, 0, 0) = point de départ de la carte ;
-  static          : map_server + TF statique identité map -> odom (l'odométrie réelle dérive : limite).
-
-Sécurité : vitesse réduite par défaut (0.10 m/s, 0.6 rad/s). Arrêt : Ctrl+C puis scripts/stop_robot.sh.
-
-Exemple :
-  ros2 launch aspi_bot aspi_real_random.launch.py map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml
-Test en simulation (Gazebo lancé à part avec sim.launch.py) : ajouter use_sim_time:=true.
-"""
 import os
 
 import yaml
@@ -31,26 +15,22 @@ def as_bool(text):
 
 
 def as_list(text):
-    """'[-1.0, -1.0, 1.0, 1.0]' -> [-1.0, -1.0, 1.0, 1.0] ; '[]' -> []."""
     value = yaml.safe_load(text)
     return [float(v) for v in value] if value else []
 
 
 def project_nodes(context):
-    """Nœuds du projet : paramètres lus au lancement (listes optionnelles comprises)."""
     cfg = {name: LaunchConfiguration(name).perform(context) for name in (
         'seed', 'run_duration', 'use_sim_time', 'forward_speed', 'turn_speed', 'fence',
         'allowed_area', 'near_collision_distance', 'use_rviz', 'output_dir')}
     sim = {'use_sim_time': as_bool(cfg['use_sim_time'])}
 
-    # Le chrono du walker démarre au premier scan, celui du tracker au premier déplacement :
-    # le walker a +5 s pour que le robot roule jusqu'à la fin de la mesure.
     walker_params = {'seed': int(cfg['seed']),
                      'forward_speed': float(cfg['forward_speed']),
                      'turn_speed': float(cfg['turn_speed']),
                      'run_duration': float(cfg['run_duration']) + 5.0}
     fence = as_list(cfg['fence'])
-    if fence:  # barrière virtuelle (repère odom) : seulement si un rectangle est donné
+    if fence:
         walker_params['fence'] = fence
 
     tracker_params = {'strategy': 'RANDOM', 'seed': int(cfg['seed']),
@@ -59,9 +39,6 @@ def project_nodes(context):
                       'output_dir': cfg['output_dir']}
     area = as_list(cfg['allowed_area'])
     if fence and not area:
-        # Robot confiné par la barrière : la mesure doit porter sur la même zone, sinon le % couvert
-        # serait calculé sur toute la carte. Hypothèse : au départ, map ≈ odom (carte construite
-        # depuis le point de départ, odom remis à zéro au lancement du robot sur ce point).
         area = fence
     if area:
         tracker_params['allowed_area'] = area
@@ -108,12 +85,9 @@ def generate_launch_description():
         DeclareLaunchArgument('near_collision_distance', default_value='0.20',
                               description='0.20 : le LDS-02 ne voit rien sous ~0.16 m'),
         DeclareLaunchArgument('use_rviz', default_value='true'),
-        # CSV du robot réel à part : ne jamais les mélanger avec le protocole de simulation
         DeclareLaunchArgument('output_dir', default_value=os.path.expanduser('~/ros2_ws/results/robot_reel')),
     ]
 
-    # Localisation pour la mesure : AMCL (pose initiale fixée dans config/amcl_real.yaml).
-    # use_composition False : sans Nav2 complet, le conteneur nav2_container n'existe pas.
     amcl = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(nav2_bringup_dir, 'launch', 'localization_launch.py')),
@@ -122,8 +96,6 @@ def generate_launch_description():
                           'autostart': 'true', 'use_composition': 'False'}.items(),
         condition=IfCondition(PythonExpression(["'", localization, "' == 'amcl'"])))
 
-    # Repli : carte seule + TF identité (carte construite depuis le point de départ, odom remis à
-    # zéro au lancement du robot sur ce même point).
     is_static = IfCondition(PythonExpression(["'", localization, "' == 'static'"]))
     map_server = Node(
         package='nav2_map_server', executable='map_server', name='map_server', output='screen',

@@ -1,16 +1,3 @@
-"""Stratégie B sur le VRAI TurtleBot3, SANS Nav2 (repli du 12/10).
-
-Même trajet boustrophédon que aspi_real_planned (coverage_planner), mais exécuté par
-coverage_follower (« tourner puis avancer », pose par TF) au lieu de Nav2 : sur le robot réel,
-Nav2 faisait tourner le robot sur place sans jamais avancer (journal).
-Localisation : carte + TF statique identité map -> odom (robot relancé sur la croix, comme
-aspi_real_random localization:=static) : même conditions de mesure que le run A en static.
-
-Exemple :
-  ros2 launch aspi_bot aspi_real_follow.launch.py map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml
-Test en simulation (Gazebo lancé à part avec sim.launch.py, carte world.yaml) :
-  use_sim_time:=true odom_x:=2.0 odom_y:=0.5   (map -> odom = -spawn, voir aspi_random)
-"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -40,7 +27,6 @@ def generate_launch_description():
         DeclareLaunchArgument('use_rviz', default_value='true'),
         DeclareLaunchArgument('output_dir',
                               default_value=os.path.expanduser('~/ros2_ws/results/robot_reel')),
-        # map -> odom : 0 sur le robot réel ; position de spawn en simulation
         DeclareLaunchArgument('odom_x', default_value='0.0'),
         DeclareLaunchArgument('odom_y', default_value='0.0'),
     ]
@@ -56,8 +42,6 @@ def generate_launch_description():
              parameters=[sim]),
         Node(package='aspi_bot', executable='coverage_planner', name='coverage_planner',
              output='screen', parameters=[sim, {'start_x': 0.0, 'start_y': 0.0}]),
-        # Le chrono du follower démarre au premier pas, celui du tracker au premier déplacement :
-        # +5 s pour que le robot roule jusqu'à la fin de la mesure.
         Node(package='aspi_bot', executable='coverage_follower', name='coverage_follower',
              output='screen',
              parameters=[sim, {'linear_speed': PythonExpression(['float(', cfg['linear_speed'], ')']),

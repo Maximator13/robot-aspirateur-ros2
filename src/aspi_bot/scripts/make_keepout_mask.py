@@ -1,30 +1,17 @@
 #!/usr/bin/env python3
-"""Génère un masque keepout (zone interdite) pour Nav2 à partir d'une carte.
-
-Usage :
-    make_keepout_mask.py CARTE.yaml XMIN YMIN XMAX YMAX [--sortie DOSSIER] [--nom keepout]
-
-Le rectangle (XMIN YMIN XMAX YMAX) est la zone AUTORISÉE, en mètres dans le repère map.
-Le masque écrit (<nom>.yaml + <nom>.pgm) a la même géométrie que la carte
-(taille, résolution, origine) : dedans = libre (blanc), HORS rectangle = occupé (noir).
-Mode trinary, mêmes seuils que la carte de référence.
-Python pur : numpy + écriture PGM (P5) à la main.
-"""
 import argparse
 import os
 import sys
 
 import numpy as np
 
-FREE_PIXEL = 254   # blanc : libre
-OCC_PIXEL = 0      # noir : occupé (interdit)
+FREE_PIXEL = 254
+OCC_PIXEL = 0
 
 
 def read_pgm(path):
-    """Lit un PGM binaire (P5, 8 bits) et renvoie un tableau [ligne, colonne]."""
     with open(path, 'rb') as f:
         raw = f.read()
-    # En-tête : magic, largeur, hauteur, maxval (commentaires '#' possibles)
     tokens, pos = [], 0
     while len(tokens) < 4:
         while raw[pos:pos + 1].isspace():
@@ -37,7 +24,7 @@ def read_pgm(path):
         while not raw[pos:pos + 1].isspace():
             pos += 1
         tokens.append(raw[start:pos])
-    pos += 1  # un seul espace après maxval
+    pos += 1
     if tokens[0] != b'P5' or int(tokens[3]) > 255:
         raise ValueError('PGM P5 8 bits attendu')
     width, height = int(tokens[1]), int(tokens[2])
@@ -46,7 +33,6 @@ def read_pgm(path):
 
 
 def write_pgm(path, image):
-    """Écrit un PGM binaire (P5, 8 bits)."""
     height, width = image.shape
     with open(path, 'wb') as f:
         f.write(f'P5\n{width} {height}\n255\n'.encode())
@@ -54,7 +40,6 @@ def write_pgm(path, image):
 
 
 def read_map_yaml(path):
-    """Lecture minimale du yaml de carte (clé: valeur sur une ligne)."""
     info = {}
     with open(path) as f:
         for line in f:
@@ -74,11 +59,6 @@ def read_map_yaml(path):
 
 
 def make_mask(height, width, origin_x, origin_y, resolution, rect):
-    """Masque [ligne image, colonne] : libre dans le rectangle, occupé ailleurs.
-
-    La ligne 0 de l'image est le HAUT de la carte (y max) ; la cellule (i, j) a son
-    centre en x = origine_x + (j + 0.5) * res, y = origine_y + (height - 1 - i + 0.5) * res.
-    """
     xmin, ymin, xmax, ymax = rect
     x = origin_x + (np.arange(width) + 0.5) * resolution
     y = origin_y + (height - 1 - np.arange(height) + 0.5) * resolution

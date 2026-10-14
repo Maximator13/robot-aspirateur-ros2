@@ -1,11 +1,3 @@
-"""Figures épurées pour le diaporama (une idée par figure, gros caractères).
-
-Lit les CSV du tracker (temps, % couvert, distance, near_collisions) et écrit dans results/figures/ :
-  slides_simulation.png : moyenne de A, moyenne de B1-B2, B3 à part ;
-  slides_reel.png       : robot réel, A et B (moyenne des 2 essais, fourchette min-max) ;
-  slides_jumeau.png     : distance parcourue, robot réel contre jumeau Gazebo.
-Usage : python3 plot_slides.py   (depuis n'importe quel dossier)
-"""
 import csv
 import glob
 import os
@@ -22,7 +14,6 @@ plt.rcParams.update({'font.size': 20, 'axes.spines.top': False, 'axes.spines.rig
 
 
 def read(path):
-    """Renvoie (temps, % couvert, distance) d'un CSV du tracker."""
     with open(path) as f:
         rows = list(csv.DictReader(f))
     t = np.array([float(r['time']) for r in rows])
@@ -32,7 +23,6 @@ def read(path):
 
 
 def on_grid(path, grid):
-    """% couvert interpolé sur une grille de temps commune (valeur figée après la fin)."""
     t, c, _ = read(path)
     return np.interp(grid, t, c)
 
@@ -48,12 +38,6 @@ def finish(ax, xlabel, xmax):
 
 
 def simulation():
-    """A : moyenne de tous les essais ; B : moyenne des essais réussis, essais bloqués à part.
-
-    Un essai B est dit bloqué si sa couverture finale reste sous 30 % (moitié de la plage des
-    essais réussis, 55 à 62 %) ; les mesures faussées par des sauts de position sont dans
-    results/invalides/ et ne sont pas lues ici.
-    """
     grid = np.linspace(0, 600, 601)
     a_runs = [on_grid(p, grid) for p in sorted(glob.glob(RES + '/RANDOM_*.csv'))]
     b_runs = [on_grid(p, grid) for p in sorted(glob.glob(RES + '/BOUSTROPHEDON_*.csv'))]
@@ -67,7 +51,7 @@ def simulation():
     for k, r in enumerate(b_bloque):
         ax.plot(grid / 60, r, color=BLUE, linewidth=3, linestyle='--', alpha=0.5,
                 label=f'B bloqué ({len(b_bloque)} essais)' if k == 0 else None)
-    ax.axvline(7, color=GREY, linewidth=2, linestyle='--')   # B réussi passe devant A vers 7 min
+    ax.axvline(7, color=GREY, linewidth=2, linestyle='--')
     ax.text(7.1, 3, '7 min : B passe devant', color=GREY, fontsize=18)
     finish(ax, 'Temps (min)', 10)
     ax.legend(loc='upper left', frameon=False)
@@ -80,7 +64,7 @@ def reel():
     a = np.array([on_grid(RES + '/robot_reel/' + n, grid) for n in
                   ('RANDOM_1_20261012-105211.csv', 'RANDOM_3_20261012-105805.csv')])
     b_files = ('BOUSTROPHEDON_1_20261012-103146.csv', 'BOUSTROPHEDON_2_20261012-110402.csv')
-    t_end = min(read(RES + '/robot_reel/' + n)[0][-1] for n in b_files)  # B n°2 arrêté, trajet fini
+    t_end = min(read(RES + '/robot_reel/' + n)[0][-1] for n in b_files)
     gb = grid[grid <= t_end]
     b = np.array([on_grid(RES + '/robot_reel/' + n, gb) for n in b_files])
     fig, ax = plt.subplots(figsize=(16, 9))
@@ -121,7 +105,6 @@ def jumeau():
 
 
 def curves(series, xmax, out_name, legend_loc='lower right'):
-    """Courbes simples : series = [(chemin CSV, libellé, couleur, style), ...]."""
     fig, ax = plt.subplots(figsize=(16, 9))
     for path, label, color, style in series:
         t, c, _ = read(path)
@@ -134,7 +117,6 @@ def curves(series, xmax, out_name, legend_loc='lower right'):
 
 
 def par_strategie():
-    """Une figure par stratégie et par banc (robot réel, jumeau)."""
     R = RES + '/robot_reel/'
     J = RES + '/jumeau/'
     curves([(R + 'RANDOM_1_20261012-105211.csv', 'A, essai 1', ORANGE, '-'),

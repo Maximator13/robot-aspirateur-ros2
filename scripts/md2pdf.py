@@ -1,8 +1,3 @@
-"""Convertit des fichiers Markdown (avec diagrammes Mermaid) en PDF via Chrome sous Windows (WSL).
-
-Usage : python3 md2pdf.py <dossier_sortie> <fichier.md> <titre> [<fichier.md> <titre> ...]
-Rendu : marked (Markdown) et mermaid (diagrammes), chargés depuis jsdelivr ; impression par Chrome headless.
-"""
 import json
 import os
 import subprocess
@@ -40,7 +35,6 @@ mermaid.initialize({{startOnLoad: false, theme: 'neutral'}}); mermaid.run({{quer
 
 
 def win(path):
-    """Chemin Linux -> chemin Windows vu depuis Chrome (\\\\wsl.localhost\\...)."""
     return '\\\\wsl.localhost\\' + DISTRO + path.replace('/', '\\')
 
 
@@ -53,7 +47,7 @@ def convert(out_dir, md_path, title):
     with open(md_path, encoding='utf-8') as f:
         md = f.read()
     html = TEMPLATE.format(title=title, base=url(os.path.dirname(md_path)) + '/', md=json.dumps(md))
-    tmp = tempfile.mkdtemp(dir=os.path.expanduser('~'))  # visible depuis Windows
+    tmp = tempfile.mkdtemp(dir=os.path.expanduser('~'))
     html_path = os.path.join(tmp, 'page.html')
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html)

@@ -1,11 +1,3 @@
-"""Carte de ce qui a vraiment été couvert en 10 min, pour A et pour B (simulation).
-
-Rejoue un rosbag du protocole : positions /odom -> repère map, puis même marquage que le
-coverage_tracker (disque de 2 cellules, seulement sur le masque atteignable de planning.py).
-Le % recalculé est comparé au CSV officiel pour vérifier la reconstruction.
-Écrit results/figures/couverture_A_B.png, couverture_A.png et couverture_B.png.
-Usage (ROS sourcé) : python3 plot_couverture.py
-"""
 import glob
 import math
 import os
@@ -22,17 +14,16 @@ from nav_msgs.msg import Odometry
 WS = os.path.expanduser('~/ros2_ws')
 sys.path.insert(0, os.path.join(WS, 'src', 'aspi_bot'))
 sys.path.insert(0, os.path.join(WS, 'scripts'))
-from aspi_bot import planning  # noqa: E402
-from plot_plans import load_map  # noqa: E402
+from aspi_bot import planning
+from plot_plans import load_map
 
 BAGS = os.path.join(WS, 'results', 'bags')
-SPAWN = (-2.0, -0.5)   # en simulation, odom est le repère du monde Gazebo ; map part du spawn
-DURATION = 600.0       # durée mesurée par le tracker (s)
-RADIUS_CELLS = 2       # rayon de nettoyage appliqué (0,10 m)
+SPAWN = (-2.0, -0.5)
+DURATION = 600.0
+RADIUS_CELLS = 2
 
 
 def odom_poses(bag_dir):
-    """Liste (t, x, y) des messages /odom du rosbag, temps simulé en secondes."""
     reader = rosbag2_py.SequentialReader()
     reader.open(rosbag2_py.StorageOptions(uri=bag_dir, storage_id='sqlite3'),
                 rosbag2_py.ConverterOptions('cdr', 'cdr'))
@@ -49,7 +40,6 @@ def odom_poses(bag_dir):
 def coverage(bag_name, reachable, ox, oy, res):
     poses = odom_poses(os.path.join(BAGS, bag_name))
     x0, y0 = poses[0][1], poses[0][2]
-    # Le tracker démarre au premier déplacement de plus de 1 cm
     t0 = next(t for t, x, y in poses if math.hypot(x - x0, y - y0) > 0.01)
     covered = np.zeros_like(reachable)
     for t, x, y in poses:
@@ -81,13 +71,13 @@ def main():
         img = np.ones((h, w, 3)) * 0.82
         img[grid == 0] = (0.97, 0.96, 0.93)
         img[grid >= 50] = (0.15, 0.17, 0.22)
-        img[reachable] = (0.93, 0.90, 0.84)          # à couvrir, pas encore couvert
-        img[covered] = color                          # couvert
+        img[reachable] = (0.93, 0.90, 0.84)
+        img[covered] = color
         ax.imshow(img, origin='lower', extent=(ox, ox + w * res, oy, oy + h * res),
                   interpolation='nearest')
         ax.set_xlim(ox + cols.min() * res - 0.2, ox + (cols.max() + 1) * res + 0.2)
         ax.set_ylim(oy + rows.min() * res - 0.4, oy + (rows.max() + 1) * res + 0.2)
-        xb, yb = ox + cols.min() * res, oy + rows.min() * res - 0.3   # barre d'échelle 1 m
+        xb, yb = ox + cols.min() * res, oy + rows.min() * res - 0.3
         ax.plot([xb, xb + 1.0], [yb, yb], color='black', linewidth=4)
         ax.text(xb + 0.5, yb + 0.08, '1 m', ha='center', fontsize=20)
         ax.set_xticks([])
@@ -98,7 +88,7 @@ def main():
     out = os.path.join(WS, 'results', 'figures')
     fig.savefig(os.path.join(out, 'couverture_A_B.png'), dpi=100)
     fig.canvas.draw()
-    for ax, name in zip(axes, ('couverture_A.png', 'couverture_B.png')):  # une image par stratégie
+    for ax, name in zip(axes, ('couverture_A.png', 'couverture_B.png')):
         box = ax.get_tightbbox(fig.canvas.get_renderer()).transformed(fig.dpi_scale_trans.inverted())
         fig.savefig(os.path.join(out, name), dpi=100, bbox_inches=box)
 

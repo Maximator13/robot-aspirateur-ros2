@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Figure et tableau du robot réel, séance du 2026-10-12 (A contre B, 5 CSV).
-
-Usage : python3 scripts/plot_reel_12oct.py
-Entrée : results/robot_reel/*_20261012-*.csv
-Sortie : results/robot_reel/coverage_vs_time_reel_12oct.png et le tableau (stdout)
-Les % à t s sont interpolés linéairement entre deux points CSV (comme plot_results.py).
-Un run B dont la couverture ne bouge plus (trajet fini) est prolongé par sa
-dernière valeur, tracée en POINTILLÉS. Le run incident de 10 h 45 est tracé à part.
-"""
 import csv
 from pathlib import Path
 
@@ -18,7 +9,6 @@ import matplotlib.pyplot as plt
 
 DOSSIER = Path(__file__).resolve().parent.parent / 'results' / 'robot_reel'
 DUREE = 300.0
-# nom -> (étiquette, couleur, style de la courbe, statut)
 RUNS = {
     'RANDOM_1_20261012-105211': ('A seed 1', '#d95f02', '-', 'valide'),
     'RANDOM_3_20261012-105805': ('A seed 3', '#e6a35c', '-', 'valide'),
@@ -36,7 +26,6 @@ def lire(nom):
 
 
 def instant_fin_de_hausse(r):
-    """Dernier instant où la couverture augmente (fin utile du trajet)."""
     k = np.nonzero(np.diff(r['coverage_percent']) > 0)[0][-1] + 1
     return float(r['time'][k])
 
@@ -68,7 +57,6 @@ def main():
             tf = instant_fin_de_hausse(r)
             masque = t <= tf
             ax.plot(t[masque], c[masque], color=coul, lw=2, label=f'{lab}')
-            # prolongation par la dernière valeur, jusqu'à 300 s : pointillés
             ax.plot([tf, DUREE], [c[-1], c[-1]], color=coul, lw=2, ls=':',
                     label=f'{lab} : valeur prolongée après la fin du trajet ({tf:.0f} s), non mesurée')
         else:

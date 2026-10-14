@@ -1,11 +1,3 @@
-"""Nœud coverage_follower : stratégie B SANS Nav2 (repli robot réel).
-
-Interface fine : /coverage_path (waypoints du boustrophédon) + pose TF map -> base_footprint
--> follow_logic.follow_step -> /cmd_vel. Arrêt devant un obstacle (LiDAR avant) et fin de run.
-Pourquoi : sur le robot réel, Nav2 tourne sur place sans avancer (journal du 12/10) ;
-ce suiveur « tourner puis avancer » est le même principe que le random_walker.
-Sécurité : sans /scan reçu, ou avec scan/TF plus vieux que data_timeout, le robot est arrêté.
-"""
 import math
 import signal
 import time
@@ -36,18 +28,18 @@ class CoverageFollower(Node):
         self.angular_speed = p('angular_speed', 0.6).value
         self.goal_tolerance = p('goal_tolerance', 0.08).value
         self.heading_tolerance = p('heading_tolerance', 0.35).value
-        self.stop_distance = p('stop_distance', 0.15).value  # obstacle devant : on n'avance pas
-        self.front_angle = math.radians(p('front_angle_deg', 30.0).value)  # demi-secteur avant
-        self.data_timeout = p('data_timeout', 1.0).value  # scan/TF plus vieux : arrêt (s)
-        self.waypoint_timeout = p('waypoint_timeout', 40.0).value  # waypoint sauté au-delà (s)
-        self.run_duration = p('run_duration', 0.0).value  # 0 = illimité
+        self.stop_distance = p('stop_distance', 0.15).value
+        self.front_angle = math.radians(p('front_angle_deg', 30.0).value)
+        self.data_timeout = p('data_timeout', 1.0).value
+        self.waypoint_timeout = p('waypoint_timeout', 40.0).value
+        self.run_duration = p('run_duration', 0.0).value
         self.map_frame = p('map_frame', 'map').value
         self.base_frame = p('base_frame', 'base_footprint').value
 
         self.waypoints = []
         self.index = 0
         self.driving = False
-        self.front = None  # None = aucun /scan reçu : on ne roule pas
+        self.front = None
         self.last_scan_s = None
         self.start_s = None
         self.wp_start_s = None
@@ -78,7 +70,6 @@ class CoverageFollower(Node):
         self.last_scan_s = self.now_s()
 
     def pose(self):
-        """(x, y, yaw) du robot dans map, ou None si la TF n'est pas disponible."""
         try:
             t = self.tf_buffer.lookup_transform(self.map_frame, self.base_frame, Time())
         except TransformException as e:
@@ -161,8 +152,6 @@ def _sigterm_vers_interruption(signum, frame):
 
 
 def main(args=None):
-    # Même arrêt propre que random_walker : contexte gardé valide pour publier des Twist nuls
-    # (le TurtleBot3 réel garde sinon la dernière consigne).
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     signal.signal(signal.SIGTERM, _sigterm_vers_interruption)
     node = CoverageFollower()

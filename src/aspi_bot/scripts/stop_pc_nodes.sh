@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Arrête TOUS les nœuds ROS lancés sur le PC (Nav2, RViz, nos nœuds, map_server...), sans fermer d'onglet.
-# Utile quand un lancement précédent est resté en arrière-plan.
-# Usage : bash ~/ros2_ws/src/aspi_bot/scripts/stop_pc_nodes.sh
-# Motifs sur des chemins d'exécutables ROS (jamais le nom de ce script ni d'un journal).
 NOEUDS="[r]os2 launch|[c]omponent_container|lib/rviz2/rviz2|lib/aspi_bot/|lib/nav2_|lib/tf2_ros/static_transform_publisher|lib/nav2_map_server/"
 if ! pgrep -f "$NOEUDS" >/dev/null; then
   echo "aucun nœud ROS ne tourne sur le PC"

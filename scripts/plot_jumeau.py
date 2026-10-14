@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""Figure et tableau : jumeau numérique (simulation) contre robot réel, 2026-10-12.
-
-Usage : python3 scripts/plot_jumeau.py
-Entrées : results/jumeau/*.csv et results/robot_reel/*_20261012-*.csv
-Sortie : results/figures/jumeau_vs_reel.png et le tableau (stdout)
-Les % à t s sont interpolés linéairement. Une courbe B s'arrête à sa dernière
-hausse de couverture, puis est prolongée par sa dernière valeur en pointillés fins.
-"""
 import csv
 from pathlib import Path
 
@@ -17,7 +9,6 @@ import matplotlib.pyplot as plt
 
 RACINE = Path(__file__).resolve().parent.parent / 'results'
 DUREE = 300.0
-# (étiquette, dossier, fichier, couleur, style)
 RUNS = [
     ('A réel seed 1', 'robot_reel', 'RANDOM_1_20261012-105211', '#d95f02', '-'),
     ('A réel seed 3', 'robot_reel', 'RANDOM_3_20261012-105805', '#e6a35c', '-'),

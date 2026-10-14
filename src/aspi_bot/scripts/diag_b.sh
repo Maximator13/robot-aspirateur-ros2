@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Diagnostic d'environ 30 s pour le run B sur le robot réel :
-# « le problème vient-il de l'horloge, du réseau ou de Nav2 ? »
-# Ne remet JAMAIS le robot à l'heure et ne lance rien sur le robot (lecture seule).
-# Usage (onglet Ubuntu du PC, Nav2 lancé si possible) :
-#   bash ~/ros2_ws/src/aspi_bot/scripts/diag_b.sh          # robot réel
-#   bash ~/ros2_ws/src/aspi_bot/scripts/diag_b.sh --sim    # simulation
-# --sim : garde l'environnement ROS courant (ROS_DOMAIN_ID, ROS_LOCALHOST_ONLY),
-# saute le SSH (horloge, charge robot) et l'âge des messages (en simulation,
-# header.stamp est en temps simulé : l'âge mesuré n'aurait aucun sens).
 SIM=0
 for a in "$@"; do
   case "$a" in
@@ -32,21 +23,17 @@ trap 'rm -rf "$TMP"' EXIT
 PB_HORLOGE=0; PB_AGE=0; PB_NAV2=0; PB_DONNEES=0; PB_TF=0
 ECART="?"
 
-# Comparaison de flottants : sup A B -> code 0 si A > B
 sup() { awk -v a="$1" -v b="$2" 'BEGIN{exit !(a>b)}'; }
 
 HAS_ROS=1
 command -v ros2 >/dev/null 2>&1 || HAS_ROS=0
 
-# Au plus 3 commandes ros2 simultanées (au-delà : « context is not valid »).
-# lance_ros CMD... : démarre en arrière-plan ; fait un `wait` toutes les 3 commandes.
 NB_JOBS=0
 lance_ros() {
   "$@" &
   NB_JOBS=$((NB_JOBS + 1))
   if [ $((NB_JOBS % 3)) -eq 0 ]; then wait; fi
 }
-# Variante pour le pipeline tf2_echo (horodatage de chaque ligne)
 tf_horodate() {
   timeout 8 ros2 run tf2_ros tf2_echo "$1" "$2" 2>&1 | while IFS= read -r l; do
     echo "$(date +%s.%N) $l"; done > "$TMP/tf_$1"
@@ -76,7 +63,6 @@ else
 fi
 fi
 
-# Mesures ROS par lots de 3 commandes max (chacune bornée par timeout), ~40 s au total.
 if [ "$HAS_ROS" = 1 ]; then
   if [ "$SIM" = 0 ]; then
     for t in scan odom; do

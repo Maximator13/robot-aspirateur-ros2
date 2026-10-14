@@ -1,9 +1,4 @@
 #!/bin/bash
-# Arrêt d'urgence du robot RÉEL : publie une vitesse nulle sur /cmd_vel. Ne bloque jamais.
-# Force ROS_LOCALHOST_ONLY=0 et le domaine du robot : ne sert PAS en simulation.
-# 1) depuis le PC (en arrière-plan, plus rapide) ; 2) directement SUR le robot via SSH.
-# Chaque voie est bornée par timeout.
-# Usage : ~/ros2_ws/src/aspi_bot/scripts/stop_robot.sh
 ROBOT=${ROBOT:-turtle@10.42.0.1}
 ROBOT_DOMAIN_ID=${ROBOT_DOMAIN_ID:-1}
 ZERO="{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"

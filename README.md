@@ -1,11 +1,18 @@
 # Robot aspirateur autonome — couverture d'une pièce (ROS 2 Humble, TurtleBot3 Burger)
 
-Projet IMT Mines Alès (cours ROS 2). Un TurtleBot3 Burger simulé doit couvrir la surface libre
-d'une pièce. Deux stratégies sont comparées avec **la même mesure** :
+> Projet réalisé seul en 12 h, en école d'ingénieur (IMT Mines Alès, cours ROS 2).
+
+Un TurtleBot3 Burger doit couvrir la surface libre d'une pièce, en simulation (Gazebo) puis sur le
+vrai robot avec son LiDAR. Deux stratégies sont comparées avec **la même mesure** :
 
 - **A — aléatoire** (« bump and turn ») : sans carte, avance et tourne d'un angle aléatoire devant un obstacle ;
-- **B — planifiée** : balayage boustrophédon calculé sur la carte, exécuté par Nav2.
+- **B — planifiée** : balayage boustrophédon calculé sur la carte, exécuté par Nav2 en simulation et par un
+  suiveur de points de passage (`coverage_follower`) sur le robot réel.
 
+Sur le robot réel, B atteint 80 % de couverture en environ 2 min (96,5 et 98,4 % en fin de trajet), contre
+73 à 75 % en 5 min pour A.
+
+Diaporama de soutenance : [`livrables/Robot_aspirateur_CCPP_ROS2.pptx`](livrables/Robot_aspirateur_CCPP_ROS2.pptx).
 Résultats, démarche et limites : [`docs/RESULTATS.md`](docs/RESULTATS.md).
 Architecture : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Algorigrammes : [`docs/ALGORIGRAMMES.md`](docs/ALGORIGRAMMES.md) ·
 État de l'art : [`docs/ETAT_DE_L_ART.md`](docs/ETAT_DE_L_ART.md) · Journal d'ingénierie : [`docs/JOURNAL.md`](docs/JOURNAL.md) ·
@@ -18,8 +25,9 @@ Perspectives : [`docs/PERSPECTIVES.md`](docs/PERSPECTIVES.md).
 | `src/aspi_interfaces/` | Message `CoverageStatus` (% couvert, distance, temps, near_collisions) |
 | `src/aspi_bot/aspi_bot/planning.py` | Python pur : masque atteignable, mesure de couverture, boustrophédon |
 | `src/aspi_bot/aspi_bot/random_logic.py` | Python pur : machine à états du robot aléatoire |
-| `src/aspi_bot/aspi_bot/*_node.py` | Nœuds ROS 2 : `random_walker`, `coverage_planner`, `coverage_executor`, `coverage_tracker` |
-| `src/aspi_bot/launch/` | `sim.launch.py` (Gazebo commun), `aspi_random.launch.py` (A), `aspi_planned.launch.py` (B) |
+| `src/aspi_bot/aspi_bot/*_node.py` | Nœuds ROS 2 : `random_walker`, `coverage_planner`, `coverage_executor`, `coverage_follower`, `coverage_tracker` |
+| `src/aspi_bot/launch/` | `sim.launch.py` (Gazebo commun), `aspi_random.launch.py` (A), `aspi_planned.launch.py` (B) ; robot réel : `aspi_real_random.launch.py`, `aspi_real_follow.launch.py` |
+| `livrables/` | Diaporama de soutenance et documents en PDF |
 | `src/aspi_bot/config/nav2_params.yaml` | Configuration Nav2 retenue (essais de réglage : `nav2_params_t*.yaml`) |
 | `src/aspi_bot/maps/` | Carte de référence `turtlebot3_world` |
 | `src/aspi_bot/test/` | Tests pytest des modules Python purs |

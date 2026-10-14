@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Relance propre du robot n°1 et vérification depuis le PC.
-# Usage (onglet Ubuntu du PC) : bash ~/ros2_ws/src/aspi_bot/scripts/robot_check.sh
 ROBOT=${ROBOT:-turtle@10.42.0.1}
 ROBOT_DOMAIN_ID=${ROBOT_DOMAIN_ID:-1}
 export ROS_DOMAIN_ID=$ROBOT_DOMAIN_ID ROS_LOCALHOST_ONLY=0
@@ -14,7 +12,6 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$ROBOT" true 2>/dev/null; then
 fi
 
 echo "== 0b. Heure du robot (pas d'horloge sauvegardée : elle repart en arrière à chaque extinction)"
-# Écart SIGNÉ (PC - robot) en ms, mesuré au milieu de l'aller-retour SSH (latence compensée)
 ecart_signe_ms() {
   local t0 r t1
   t0=$(date +%s%3N); r=$(ssh "$ROBOT" date +%s%3N); t1=$(date +%s%3N)
@@ -25,12 +22,9 @@ E=$(ecart_signe_ms)
 [ -n "$E" ] || { echo "mesure d'heure impossible (SSH ?)"; exit 1; }
 echo "   écart PC - robot : $(abs $E) ms"
 if [ "$(abs $E)" -gt 100 ]; then
-  # Mot de passe lu une fois, AVANT toute mesure (le temps de frappe ne fausse rien).
   read -rs -p "   heure à corriger. Mot de passe sudo du robot : " PW; echo
   for essai in 1 2 3; do
     E=$(ecart_signe_ms)
-    # Correction relative appliquée PAR le robot à sa propre horloge : la durée du trajet
-    # SSH n'entre plus dans l'heure réglée (contrairement à l'envoi d'une heure absolue).
     echo "$PW" | ssh "$ROBOT" "sudo -S -p '' date -s @\$(python3 -c 'import time; print(f\"{time.time() + $E / 1000:.3f}\")')" >/dev/null
     E=$(ecart_signe_ms)
     echo "   essai $essai : nouvel écart $(abs $E) ms"
@@ -41,8 +35,6 @@ if [ "$(abs $E)" -gt 100 ]; then
 fi
 
 echo "== 1. Arrêt des anciens lancements sur le robot"
-# Motifs à crochets ([t]urtlebot3_ros) : le shell distant contient lui-même la ligne de commande ;
-# sans crochets, pkill -f se tuerait lui-même. « [t]x » correspond à « tx » mais pas à la chaîne « [t]x ».
 ssh "$ROBOT" 'pkill -f "[t]urtlebot3_ros"; pkill -f "[l]d08_driver"; pkill -f "[r]obot_state_publisher"; pkill -f "[r]os2 launch turtlebot3_bringup"; sleep 2; pgrep -af "[t]urtlebot3_ros|[l]d08" || echo "plus rien ne tourne"'
 
 echo "== 2. Relance du robot (journal sur le robot : ~/bringup.log)"
@@ -52,7 +44,6 @@ sleep 15
 ssh "$ROBOT" 'grep -E "Run!|ERROR|LDS-02 started" ~/bringup.log'
 
 echo "== 2b. Description du robot publiée aussi par le PC (/tf_static perdu sur le Wi-Fi sinon)"
-# pkill -x (nom exact, tronqué à 15 caractères) : -f tuerait aussi ce script.
 pkill -x robot_state_pub; sleep 1
 nohup bash "$(dirname "$(readlink -f "$0")")/pc_robot_description.sh" > /tmp/state_publisher.log 2>&1 &
 sleep 3

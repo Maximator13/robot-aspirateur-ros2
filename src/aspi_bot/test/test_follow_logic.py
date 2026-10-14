@@ -16,7 +16,7 @@ def test_waypoint_atteint():
 def test_rotation_sur_place_si_waypoint_derriere():
     v, w, reached, driving = follow_step(0.0, 0.0, 0.0, -1.0, -0.1, driving=False)
     assert v == 0.0 and not reached and not driving
-    assert w < 0  # cible à ~-174° : tourner dans le sens horaire (chemin le plus court)
+    assert w < 0
 
 
 def test_avance_si_aligne():
@@ -25,7 +25,6 @@ def test_avance_si_aligne():
 
 
 def test_hysteresis_reste_en_avance():
-    # erreur de cap de 0.5 rad : > tolérance (0.35) mais < 2 x tolérance -> on continue d'avancer
     tx, ty = math.cos(0.5), math.sin(0.5)
     v, _, _, driving = follow_step(0.0, 0.0, 0.0, tx, ty, driving=True)
     assert v > 0 and driving

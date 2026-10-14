@@ -1,8 +1,3 @@
-"""Nœud coverage_planner (stratégie B) : /map -> /coverage_path.
-
-Interface fine : toute la logique est dans aspi_bot.planning (Python pur).
-Une publication par carte reçue.
-"""
 import math
 
 import rclpy
@@ -15,7 +10,6 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 from aspi_bot import planning
 
-# /map et /coverage_path : RELIABLE + TRANSIENT_LOCAL (abonné tardif possible)
 LATCHED_QOS = QoSProfile(
     depth=1,
     reliability=ReliabilityPolicy.RELIABLE,
@@ -24,7 +18,6 @@ LATCHED_QOS = QoSProfile(
 
 
 def yaw_to_quaternion(yaw):
-    """Quaternion (x, y, z, w) d'une rotation d'angle yaw autour de z."""
     return 0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)
 
 
@@ -36,11 +29,9 @@ class CoveragePlanner(Node):
         self.sweep_spacing = self.declare_parameter('sweep_spacing', 0.18).value
         self.start_x = self.declare_parameter('start_x', 0.0).value
         self.start_y = self.declare_parameter('start_y', 0.0).value
-        # Défaut False : les contournements de transitions n'ont pas amélioré le balayage (essai T4 négatif, voir docs/JOURNAL.md)
         self.plan_transitions = self.declare_parameter('plan_transitions', False).value
         self.transition_step = self.declare_parameter('transition_step', 0.3).value
 
-        # Zone autorisée [xmin, ymin, xmax, ymax] en repère map ; [] = toute la carte
         self.declare_parameter(
             'allowed_area', Parameter.Type.DOUBLE_ARRAY)
         self.allowed_area = [float(v) for v in (self.get_parameter_or('allowed_area').value or [])]
@@ -54,14 +45,14 @@ class CoveragePlanner(Node):
     def on_map(self, msg):
         info = msg.info
         free = planning.occupancy_to_free(msg.data, info.width, info.height)
-        if self.allowed_area:  # même restriction que le tracker (avant reachable_mask)
+        if self.allowed_area:
             free = planning.restrict_to_rect(
                 free, info.origin.position.x, info.origin.position.y,
                 info.resolution, self.allowed_area)
             xmin, ymin, xmax, ymax = self.allowed_area
             bord = min(self.start_x - xmin, xmax - self.start_x,
                        self.start_y - ymin, ymax - self.start_y)
-            if bord < 0.5:  # mesuré : départ au bord -> le robot ne bouge jamais
+            if bord < 0.5:
                 self.get_logger().error(
                     f'Départ ({self.start_x}, {self.start_y}) à {bord:.2f} m du bord de '
                     'allowed_area (ou dehors) : moins de 0.5 m de marge, le robot risque '
@@ -93,7 +84,6 @@ class CoveragePlanner(Node):
                 self.get_logger().warn(
                     f'{n_unresolved} transition(s) non résolue(s) : gardées en ligne droite')
         self.path_pub.publish(self.make_path(waypoints))
-        # Même formule que planning.boustrophedon_waypoints
         eff_spacing = max(1, int(round(self.sweep_spacing / info.resolution))) * info.resolution
         self.get_logger().info(
             f'{n_cells} cellules atteignables, {len(waypoints)} waypoints publiés sur /coverage_path '

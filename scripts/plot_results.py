@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""Analyse des CSV de résultats : courbe % couvert vs temps + tableau récapitulatif.
-
-Usage :
-    python3 scripts/plot_results.py [--results-dir DIR] [--duration 600]
-                                    [--no-mean] [--labels HORODATAGE=ETIQUETTE,...]
-
---no-mean : ni courbe moyenne ni ligne de moyenne (runs de modes différents,
-            par exemple temps réel contre accéléré : moyenner n'a pas de sens).
---labels  : étiquette par run, repérée par son horodatage (ex. 174302=temps réel).
-
-Entrée : DIR/<STRATEGIE>_<seed>_<AAAAMMJJ-HHMMSS>.csv
-         colonnes : time, coverage_percent, distance, near_collisions
-Sortie : DIR/coverage_vs_time.png, DIR/coverage_vs_time_runs.png et DIR/summary.md
-"""
 import argparse
 import csv
 import sys
@@ -20,18 +6,16 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # pas de fenêtre : on écrit seulement un PNG
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-SEUIL = 80.0  # % de couverture visé
-T_INTERMEDIAIRE = 300.0  # s : instant de la colonne « % à 300 s »
-# Couleurs sobres, distinctes (y compris en niveaux de gris / daltonisme)
+SEUIL = 80.0
+T_INTERMEDIAIRE = 300.0
 COULEURS = {'RANDOM': '#d95f02', 'BOUSTROPHEDON': '#1b6ca8'}
 COULEUR_DEFAUT = '#555555'
 
 
 def parse_nom(path):
-    """Déduit (stratégie, seed) du nom <STRATEGIE>_<seed>_<date>.csv."""
     parts = path.stem.split('_')
     strategie = parts[0].upper()
     seed = parts[1] if len(parts) > 1 else '?'
@@ -39,7 +23,6 @@ def parse_nom(path):
 
 
 def lire_run(path):
-    """Lit un CSV. Retourne un dict de tableaux numpy, ou None si vide/illisible."""
     try:
         with open(path, newline='') as f:
             lignes = list(csv.DictReader(f))
@@ -58,24 +41,15 @@ def lire_run(path):
 
 
 def temps_pour_seuil(run, seuil=SEUIL):
-    """Premier instant où la couverture atteint le seuil, ou None."""
     idx = np.nonzero(run['cov'] >= seuil)[0]
     return float(run['t'][idx[0]]) if idx.size else None
 
 
 def courbe_sur_grille(run, grille):
-    """Interpole la couverture sur la grille commune.
-
-    Choix : la grille va jusqu'à --duration. Un run plus court est prolongé par
-    sa dernière valeur (la couverture ne baisse jamais : un run fini garde son
-    résultat). Cela évite de tronquer tous les runs au plus court.
-    np.interp garde déjà la dernière valeur à droite.
-    """
     return np.interp(grille, run['t'], run['cov'])
 
 
 def etiquette(run, labels):
-    """Étiquette d'un run : celle donnée par --labels (suffixe d'horodatage), sinon vide."""
     for cle, txt in labels.items():
         if run['horodatage'].endswith(cle):
             return txt
@@ -83,13 +57,9 @@ def etiquette(run, labels):
 
 
 def tracer(runs_par_strat, duration, sortie, no_mean=False, labels=None):
-    """Trace moyenne + enveloppe min/max + runs individuels par stratégie.
-
-    Avec no_mean : seulement les runs, chacun avec son étiquette, sans moyenne.
-    """
     labels = labels or {}
     grille = np.arange(0, duration + 1, 1.0)
-    x = grille / 60.0  # minutes
+    x = grille / 60.0
     fig, ax = plt.subplots(figsize=(9, 5.5), dpi=150)
     for strat, runs in sorted(runs_par_strat.items()):
         c = COULEURS.get(strat, COULEUR_DEFAUT)
@@ -120,7 +90,6 @@ def tracer(runs_par_strat, duration, sortie, no_mean=False, labels=None):
 
 
 def tracer_par_run(runs_par_strat, duration, sortie):
-    """Seconde figure : un sous-graphe par stratégie, chaque run étiqueté (seed)."""
     n = len(runs_par_strat)
     fig, axes = plt.subplots(1, n, figsize=(6 * n, 5), dpi=150, sharey=True,
                              squeeze=False)
@@ -145,10 +114,6 @@ def tracer_par_run(runs_par_strat, duration, sortie):
 
 
 def cov_a(run, t):
-    """Couverture à l'instant t, par interpolation linéaire entre les deux points CSV voisins.
-
-    C'est la seule méthode utilisée pour toutes les valeurs « % à t s » du projet.
-    """
     return float(np.interp(t, run['t'], run['cov']))
 
 
@@ -166,7 +131,6 @@ def ligne_run(r, labels=None):
 
 
 def ligne_moyenne(strat, runs):
-    """Ligne moyenne ± écart-type (temps 80 % : sur les runs qui l'atteignent)."""
     def ms(vals, fmt):
         v = np.array(vals, dtype=float)
         sd = v.std(ddof=1) if len(v) > 1 else 0.0
@@ -184,7 +148,6 @@ def ligne_moyenne(strat, runs):
 
 
 def construire_tableau(runs_par_strat, no_mean=False, labels=None):
-    """Tableau Markdown : une ligne par run, puis (sauf no_mean) moyenne ± écart-type."""
     out = ['| Stratégie | Seed | Durée | % final | % à 300 s | Temps pour 80 % | Distance (m) | near_collisions |',
            '|---|---|---|---|---|---|---|---|']
     for strat, runs in sorted(runs_par_strat.items()):

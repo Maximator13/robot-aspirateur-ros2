@@ -1,19 +1,3 @@
-"""Stratégie B sur le VRAI TurtleBot3 (pas de Gazebo).
-
-Le robot exécute `turtlebot3_bringup robot.launch.py` (via SSH). Ce launch tourne sur le PC :
-Nav2 (config/nav2_params_real.yaml : vitesse réduite, use_sim_time false, AMCL avec pose initiale
-(0, 0, 0)) + coverage_planner + coverage_executor + coverage_tracker + RViz.
-
-Zone interdite (option) : keepout:=true lance le serveur du masque (maps/keepout.yaml, généré par
-scripts/make_keepout_mask.py) et costmap_filter_info_server ; allowed_area limite AUSSI le balayage
-et la mesure au même rectangle (sinon des waypoints tomberaient dans la zone interdite).
-
-Sécurité : 0.10 m/s. Arrêt : Ctrl+C (l'executor annule le but) puis scripts/stop_robot.sh.
-
-Exemple :
-  ros2 launch aspi_bot aspi_real_planned.launch.py map:=$HOME/ros2_ws/src/aspi_bot/maps/zone_reelle.yaml
-Test en simulation (Gazebo lancé à part avec sim.launch.py) : ajouter use_sim_time:=true.
-"""
 import os
 
 import yaml
@@ -33,13 +17,11 @@ def as_bool(text):
 
 
 def as_list(text):
-    """'[-1.0, -1.0, 1.0, 1.0]' -> [-1.0, -1.0, 1.0, 1.0] ; '[]' -> []."""
     value = yaml.safe_load(text)
     return [float(v) for v in value] if value else []
 
 
 def project_nodes(context):
-    """Nœuds du projet : paramètres lus au lancement (zone autorisée optionnelle)."""
     cfg = {name: LaunchConfiguration(name).perform(context) for name in (
         'seed', 'run_duration', 'use_sim_time', 'allowed_area', 'near_collision_distance',
         'use_rviz', 'output_dir', 'localization')}
@@ -50,13 +32,11 @@ def project_nodes(context):
 
     aspi_dir = get_package_share_directory('aspi_bot')
     nodes = [
-        # Départ = origine de la carte (carte construite depuis le point de départ marqué au sol)
         Node(package='aspi_bot', executable='coverage_planner', name='coverage_planner',
              output='screen', parameters=[sim, {'start_x': 0.0, 'start_y': 0.0}, area_param]),
         Node(package='aspi_bot', executable='coverage_executor', name='coverage_executor',
              output='screen',
              parameters=[sim, {'initial_x': 0.0, 'initial_y': 0.0, 'initial_yaw': 0.0,
-                               # Sans AMCL (localization:=static), pas de pose initiale à attendre
                                'use_amcl': cfg['localization'] == 'amcl',
                                'max_duration': run_duration + 10.0}]),
         Node(package='aspi_bot', executable='coverage_tracker', name='coverage_tracker',
@@ -104,16 +84,11 @@ def generate_launch_description():
         DeclareLaunchArgument('localization', default_value='amcl', choices=['amcl', 'static'],
                               description='amcl (Nav2 complet) ou static : sans AMCL, TF statique '
                                           'map -> odom (repli si AMCL/TF bloquent)'),
-        # Décalage map -> odom du mode static : 0 sur le robot réel (odom remis à zéro au lancement,
-        # sur le point de départ) ; en simulation, odom est en repère monde : passer -spawn.
         DeclareLaunchArgument('odom_x', default_value='0.0'),
         DeclareLaunchArgument('odom_y', default_value='0.0'),
-        # CSV du robot réel à part : ne jamais les mélanger avec le protocole de simulation
         DeclareLaunchArgument('output_dir', default_value=os.path.expanduser('~/ros2_ws/results/robot_reel')),
     ]
 
-    # Le filtre keepout est déclaré dans nav2_params_real.yaml mais désactivé (enabled: False) :
-    # on l'active dans les deux costmaps seulement si keepout:=true.
     keepout = LaunchConfiguration('keepout')
     nav2_params_final = RewrittenYaml(
         source_file=nav2_params, root_key='', convert_types=True,
@@ -125,17 +100,12 @@ def generate_launch_description():
     with_amcl = IfCondition(PythonExpression(["'", localization, "' == 'amcl'"]))
     is_static = IfCondition(PythonExpression(["'", localization, "' == 'static'"]))
 
-    # Mode amcl : Nav2 complet (map_server + AMCL + navigation)
     nav2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(nav2_bringup_dir, 'launch', 'bringup_launch.py')),
         launch_arguments={'map': map_yaml, 'params_file': nav2_params_final,
                           'use_sim_time': use_sim_time, 'autostart': 'true'}.items(),
         condition=with_amcl)
 
-    # Mode static : navigation seule (sans AMCL), carte servie à part, map -> odom fixe.
-    # Nav2 chargé dans UN conteneur, comme le bringup complet : avec un processus par nœud
-    # (use_composition False), les essais en simulation montraient plus de charge CPU et des
-    # démarrages bloqués (change_state sans réponse).
     sim_param = {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)}
     nav2_container = Node(
         package='rclcpp_components', executable='component_container_isolated',
@@ -162,7 +132,6 @@ def generate_launch_description():
                    '--frame-id', 'map', '--child-frame-id', 'odom'],
         parameters=[sim_param], condition=is_static)
 
-    # Zone interdite : masque + informations du filtre, activés par leur propre lifecycle manager
     with_keepout = IfCondition(LaunchConfiguration('keepout'))
     sim = {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)}
     mask_server = Node(

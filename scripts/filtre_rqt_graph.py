@@ -1,12 +1,3 @@
-"""Allège un graphe exporté par export_rqt_graph.py : ne garde que nos nœuds et leurs topics.
-
-Les nœuds fournis par Gazebo, Nav2, map_server, robot_state_publisher, etc. sont retirés ;
-les topics reliés à nos nœuds sont gardés, pour voir ce que chacun lit et publie.
-Actions : les topics internes /<action>/_action/* sont regroupés en une seule boîte « action ».
-Seule l'action réellement utilisée (follow_waypoints) est gardée : le client BasicNavigator
-ouvre aussi des clients vers les autres actions de Nav2, qu'il n'appelle pas.
-Usage : python3 filtre_rqt_graph.py <graphe.dot> <sortie.png>
-"""
 import subprocess
 import sys
 
@@ -27,7 +18,7 @@ def nom(node):
 def main():
     graph = pydot.graph_from_dot_file(sys.argv[1])[0]
     noeuds = {n.get_name(): n for n in graph.get_nodes() if n.get_name() not in ('node', 'graph', 'edge')}
-    for sub in graph.get_subgraphs():                     # actions regroupées par rqt_graph
+    for sub in graph.get_subgraphs():
         for n in sub.get_nodes():
             noeuds[n.get_name()] = n
     aretes = list(graph.get_edges()) + [e for s in graph.get_subgraphs() for e in s.get_edges()]
@@ -38,7 +29,6 @@ def main():
     topics = {s for s, d in lien if d in garde} | {d for s, d in lien if s in garde}
     garde |= {k for k in topics if k in noeuds and not est_ros(k)}
 
-    # Actions : regrouper /<action>/_action/feedback|status en une boîte, ne garder que celles utilisées
     actions = {}
     for k in list(garde):
         if not est_ros(k) and '/_action/' in nom(noeuds[k]):
@@ -64,7 +54,7 @@ def main():
                                 fontname='Courier', fontsize='16'))
     vus = set()
     for s, d in sorted(set(lien)):
-        if s in actions and d in garde:          # le nœud client appelle l'action
+        if s in actions and d in garde:
             s, d = d, actions[s]
             if (s, d) in vus:
                 continue

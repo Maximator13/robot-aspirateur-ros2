@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""Test Nav2 sur le robot réel : UN objectif dans la zone, et vérification du mouvement RÉEL.
-
-Le but est la cellule atteignable la plus proche du centre de la zone (même masque que le
-planner), pour ne jamais viser un mur. Le critère de réussite est le déplacement mesuré
-sur /odom, pas le statut de Nav2 (incident 10 : Nav2 annonçait « réussi » sans mouvement).
-Usage : python3 goal_test.py CARTE.yaml [static]   (static : Nav2 sans AMCL)
-Sortie : 0 = le robot a bougé, 1 = pas de mouvement réel, 2 = Nav2 pas prêt / erreur.
-"""
 import math
 import os
 import sys
@@ -21,17 +13,16 @@ from nav_msgs.msg import Odometry, Path
 from aspi_bot.planning import (cell_to_world, nearest_true_cell, occupancy_to_free,
                                reachable_mask, world_to_cell)
 
-MOUVEMENT_MIN = 0.15   # m : en dessous, on considère que le robot n'a pas bougé
-DUREE_MAX = 60.0       # s : temps laissé à Nav2 pour atteindre le but
+MOUVEMENT_MIN = 0.15
+DUREE_MAX = 60.0
 
 
 def lire_carte(chemin_yaml):
-    """Carte map_server (yaml + pgm P5) -> (masque libre, origine x, origine y, résolution)."""
     meta = yaml.safe_load(open(chemin_yaml))
     pgm = os.path.join(os.path.dirname(chemin_yaml), meta['image'])
     brut = open(pgm, 'rb').read()
     champs, pos = [], 0
-    while len(champs) < 4:  # P5, largeur, hauteur, max (commentaires # ignorés)
+    while len(champs) < 4:
         while brut[pos:pos + 1].isspace():
             pos += 1
         if brut[pos:pos + 1] == b'#':
@@ -44,7 +35,7 @@ def lire_carte(chemin_yaml):
         pos = fin
     w, h = int(champs[1]), int(champs[2])
     img = np.frombuffer(brut[pos + 1:pos + 1 + w * h], dtype=np.uint8).reshape(h, w)
-    img = img[::-1]  # image : ligne 0 en haut ; OccupancyGrid : ligne 0 en bas
+    img = img[::-1]
     occ = np.where(img > 250, 0, np.where(img < 50, 100, -1)).astype(np.int8)
     free = occupancy_to_free(occ.flatten(), w, h)
     ox, oy = meta['origin'][0], meta['origin'][1]
@@ -80,8 +71,6 @@ def main():
                     yaw=math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)))
     nav.create_subscription(Odometry, '/odom', sur_odom, 10)
 
-    # Instrumentation : ce que commande le contrôleur (cmd_vel_nav), ce qui part au robot
-    # (cmd_vel, après le velocity_smoother) et le chemin planifié (/plan).
     cmd = {'/cmd_vel_nav': [], '/cmd_vel': []}
     for topic in cmd:
         nav.create_subscription(Twist, topic,
@@ -108,7 +97,7 @@ def main():
     while not nav.isTaskComplete():
         rclpy.spin_once(nav, timeout_sec=0.1)
         t = (nav.get_clock().now() - t0).nanoseconds * 1e-9
-        if t >= prochain:  # chronologie toutes les 2 s
+        if t >= prochain:
             prochain += 2.0
             c = cmd['/cmd_vel_nav'][-1] if cmd['/cmd_vel_nav'] else (0.0, 0.0)
             r = cmd['/cmd_vel'][-1] if cmd['/cmd_vel'] else (0.0, 0.0)
@@ -120,7 +109,7 @@ def main():
             nav.cancelTask()
             break
     resultat = nav.getResult()
-    for _ in range(10):  # dernière odométrie
+    for _ in range(10):
         rclpy.spin_once(nav, timeout_sec=0.1)
     bouge = math.hypot(odom['x'] - x0, odom['y'] - y0)
     print(f'[goal_test] statut Nav2 : {resultat}')

@@ -1,20 +1,10 @@
 #!/usr/bin/env bash
-# Déblocage du run B sur le robot réel, en UNE commande et dans le bon ordre :
-#   1. robot_check (horloge, bringup, description du robot) AVANT tout nœud côté PC ;
-#   2. Nav2 seul (carte réelle) ; 3. diag_b ; 4. un objectif, mouvement vérifié sur /odom.
-# Tout est enregistré dans results/robot_reel/debloque_<date>.log.
-# Usage : PC sur le Wi-Fi du robot, robot sur la croix, AUCUN autre onglet ROS ouvert :
-#   bash ~/ros2_ws/src/aspi_bot/scripts/debloque_b.sh            (Nav2 avec AMCL)
-#   bash ~/ros2_ws/src/aspi_bot/scripts/debloque_b.sh static     (repli : Nav2 sans AMCL)
-#   bash ~/ros2_ws/src/aspi_bot/scripts/debloque_b.sh static nocoll   (+ sans détection de collision RPP)
 MODE=${1:-amcl}
 S=$(dirname "$(readlink -f "$0")")
 WS=$HOME/ros2_ws
 CARTE=$WS/src/aspi_bot/maps/zone_reelle.yaml
 PARAMS=$WS/install/aspi_bot/share/aspi_bot/config/nav2_params_real.yaml
 if [ "${2:-}" = nocoll ]; then
-  # Essai : RPP sans « collision ahead » (le planner global évite toujours les murs de la carte).
-  # Copie hors dépôt, la config officielle n'est pas modifiée.
   sed 's/use_collision_detection: true/use_collision_detection: false/' "$PARAMS" > "$HOME/nav2_params_real_nocoll.yaml"
   PARAMS=$HOME/nav2_params_real_nocoll.yaml
 fi
@@ -26,8 +16,6 @@ source "$WS/install/setup.bash"
 export ROS_DOMAIN_ID=${ROBOT_DOMAIN_ID:-1} ROS_LOCALHOST_ONLY=0
 echo "### debloque_b $(date) mode=$MODE"
 
-# 0. Rien ne doit tourner côté PC (règle : horloge d'abord, nœuds ensuite) : on nettoie
-# automatiquement les restes d'un lancement précédent au lieu de s'arrêter.
 echo "=== 0/4 nettoyage des nœuds ROS restés sur le PC"
 bash "$S/stop_pc_nodes.sh"
 
@@ -36,7 +24,6 @@ bash "$S/robot_check.sh" || { echo "STOP : robot_check a échoué (Wi-Fi du robo
 
 echo "=== 2/4 Nav2 seul (log : /tmp/nav2_debloque.log)"
 if [ "$MODE" = static ]; then
-  # Sans AMCL : map -> odom identité (le robot vient d'être relancé sur la croix)
   ros2 run tf2_ros static_transform_publisher --frame-id map --child-frame-id odom > /tmp/tf_static_map.log 2>&1 &
   TFPID=$!
   ros2 launch nav2_bringup navigation_launch.py params_file:="$PARAMS" use_sim_time:=false \
@@ -52,8 +39,6 @@ else
   NAVPID=$!
 fi
 arret() {
-  # Les processus lancés en arrière-plan par un script ignorent SIGINT (pas de contrôle de
-  # tâches) : l'ancien « kill -INT » ne les arrêtait pas. stop_pc_nodes envoie TERM puis KILL.
   echo "=== arrêt de Nav2 et du robot"
   bash "$S/stop_robot.sh"
   bash "$S/stop_pc_nodes.sh"
@@ -69,7 +54,6 @@ bash "$S/diag_b.sh"
 echo "=== 4/4 test de mouvement (un seul objectif, au centre de la zone)"
 echo "   Une personne près du robot, la main prête à le soulever. Entrée pour lancer, Ctrl+C pour annuler."
 read -r
-# En mode static, goal_test attend controller_server au lieu d'AMCL
 timeout 180 python3 "$S/goal_test.py" "$CARTE" "$( [ "$MODE" = static ] && echo static )"; R=$?
 
 echo

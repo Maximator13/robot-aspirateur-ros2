@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Figure et tableau du robot réel (séance du 2026-10-09), runs valides seulement.
-
-Usage : python3 scripts/plot_robot_reel.py
-Entrée : results/robot_reel/*.csv (colonnes time, coverage_percent, distance, near_collisions)
-Sortie : results/robot_reel/coverage_vs_time_reel.png et le tableau (stdout)
-Les % à t s sont interpolés linéairement entre deux points CSV (comme plot_results.py).
-"""
 import csv
 from pathlib import Path
 
@@ -15,8 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 DOSSIER = Path(__file__).resolve().parent.parent / 'results' / 'robot_reel'
-T_FIGE = 146.5  # s : après cet instant, le run 121427 n'a plus de déplacement mesuré
-# horodatage -> (étiquette, couleur) ; runs valides uniquement
+T_FIGE = 146.5
 VALIDES = {
     'RANDOM_1_20261009-111324': ('seed 1, 11h13 (arrêt manuel à 249 s)', '#d95f02'),
     'RANDOM_2_20261009-120622': ('seed 2, 12h06 (arrêt manuel à 151 s)', '#1b6ca8'),

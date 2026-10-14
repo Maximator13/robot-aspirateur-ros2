@@ -1,9 +1,3 @@
-"""Exporte le graphe nœuds/topics du système qui tourne, avec le moteur de rqt_graph.
-
-Même code que rqt_graph (paquet rqt_graph, mode « Nodes/Topics (active) »), sans la fenêtre :
-le graphe est écrit en .dot puis rendu en PNG par Graphviz.
-Usage (ROS sourcé, système lancé) : python3 export_rqt_graph.py <sortie.png> [secondes d'attente]
-"""
 import subprocess
 import sys
 import time
@@ -19,7 +13,7 @@ def main():
     attente = float(sys.argv[2]) if len(sys.argv) > 2 else 5.0
     rclpy.init()
     node = rclpy.create_node('export_rqt_graph')
-    t_fin = time.time() + attente           # laisser la découverte DDS trouver tous les nœuds
+    t_fin = time.time() + attente
     while time.time() < t_fin:
         rclpy.spin_once(node, timeout_sec=0.2)
     graph = Graph(node)
