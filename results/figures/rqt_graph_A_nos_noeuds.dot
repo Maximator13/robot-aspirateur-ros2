@@ -1,0 +1,20 @@
+digraph G {
+nodesep="0.35";
+rankdir=LR;
+ranksep="0.6";
+n___coverage_tracker [color="#172236", fillcolor="#FFFFFF", fontcolor="#172236", fontname="Helvetica-Bold", fontsize=18, label=coverage_tracker, penwidth="2.5", shape=box, style="rounded,filled,bold"];
+n___random_walker [color="#B04A06", fillcolor="#FFFFFF", fontcolor="#B04A06", fontname="Helvetica-Bold", fontsize=18, label=random_walker, penwidth="2.5", shape=box, style="rounded,filled,bold"];
+n_n__tf [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/tf", shape=box, style="rounded,filled"];
+t___cmd_vel [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/cmd_vel", shape=box, style="rounded,filled"];
+t___coverage_map [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/coverage_map", shape=box, style="rounded,filled"];
+t___coverage_status [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/coverage_status", shape=box, style="rounded,filled"];
+t___map [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/map", shape=box, style="rounded,filled"];
+t___scan [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/scan", shape=box, style="rounded,filled"];
+n___coverage_tracker -> t___coverage_map  [color="#172236", penwidth="1.6"];
+n___coverage_tracker -> t___coverage_status  [color="#172236", penwidth="1.6"];
+n___random_walker -> t___cmd_vel  [color="#172236", penwidth="1.6"];
+n_n__tf -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+t___map -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+t___scan -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+t___scan -> n___random_walker  [color="#172236", penwidth="1.6"];
+}

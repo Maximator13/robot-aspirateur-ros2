@@ -1,0 +1,30 @@
+digraph G {
+nodesep="0.35";
+rankdir=LR;
+ranksep="0.6";
+n___coverage_executor [color="#1F5F99", fillcolor="#FFFFFF", fontcolor="#1F5F99", fontname="Helvetica-Bold", fontsize=18, label=coverage_executor, penwidth="2.5", shape=box, style="rounded,filled,bold"];
+n___coverage_planner [color="#1F5F99", fillcolor="#FFFFFF", fontcolor="#1F5F99", fontname="Helvetica-Bold", fontsize=18, label=coverage_planner, penwidth="2.5", shape=box, style="rounded,filled,bold"];
+n___coverage_tracker [color="#172236", fillcolor="#FFFFFF", fontcolor="#172236", fontname="Helvetica-Bold", fontsize=18, label=coverage_tracker, penwidth="2.5", shape=box, style="rounded,filled,bold"];
+n_n__tf [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/tf", shape=box, style="rounded,filled"];
+t___amcl_pose [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/amcl_pose", shape=box, style="rounded,filled"];
+t___coverage_map [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/coverage_map", shape=box, style="rounded,filled"];
+t___coverage_path [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/coverage_path", shape=box, style="rounded,filled"];
+t___coverage_status [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/coverage_status", shape=box, style="rounded,filled"];
+t___initialpose [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/initialpose", shape=box, style="rounded,filled"];
+t___map [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/map", shape=box, style="rounded,filled"];
+t___odom [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/odom", shape=box, style="rounded,filled"];
+t___scan [color="#F3DCC6", fillcolor="#F3DCC6", fontname=Courier, fontsize=16, label="/scan", shape=box, style="rounded,filled"];
+action_follow_waypoints [color="#1F5F99", fillcolor="#D3E1EE", fontname=Courier, fontsize=16, label="action /follow_waypoints", shape=box, style="rounded,filled,dashed"];
+n___coverage_executor -> t___initialpose  [color="#172236", penwidth="1.6"];
+n___coverage_planner -> t___coverage_path  [color="#172236", penwidth="1.6"];
+n___coverage_tracker -> t___coverage_map  [color="#172236", penwidth="1.6"];
+n___coverage_tracker -> t___coverage_status  [color="#172236", penwidth="1.6"];
+n_n__tf -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+t___amcl_pose -> n___coverage_executor  [color="#172236", penwidth="1.6"];
+t___coverage_path -> n___coverage_executor  [color="#172236", penwidth="1.6"];
+n___coverage_executor -> action_follow_waypoints  [color="#1F5F99", penwidth="1.6", style=dashed];
+t___map -> n___coverage_planner  [color="#172236", penwidth="1.6"];
+t___map -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+t___odom -> n___coverage_executor  [color="#172236", penwidth="1.6"];
+t___scan -> n___coverage_tracker  [color="#172236", penwidth="1.6"];
+}

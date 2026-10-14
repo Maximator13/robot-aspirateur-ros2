@@ -779,3 +779,11 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Choix** : phrases de bas de slide retirées ou mises en puces ; CCPP écrit en toutes lettres ; état de l'art avec une colonne « pourquoi » ; « le juge » remplacé par « coverage_tracker » ; « conducteur » remplacé par « Nav2, le programme qui conduit le robot de point en point » ; AMCL et les 27 s expliqués en trois étapes ; LiDAR tourné expliqué par l'odométrie seule ; écarts possibles du suiveur mis en avant ; résultat réel présenté comme « à confirmer » (2 essais, position par les roues) ; trait à 7 min sur la courbe de simulation.
 - **Justification** : chaque mot affiché doit pouvoir être expliqué par les deux membres du binôme.
 - **Résultat-leçon** : un résultat favorable sur 2 essais se présente avec ses réserves sur la slide elle-même, pas seulement dans les notes.
+
+### 2026-10-14 · Graphes rqt_graph en annexe
+
+- **Contexte** : prouver que les schémas de principe des slides 6 et 7 correspondent au système réel, comme le demande le cours (vérifier avec rqt_graph).
+- **Options envisagées** : capture de la fenêtre rqt_graph (graphe minuscule une fois agrandi, et `/cmd_vel` absent à cause des filtres par défaut) ; export du graphe avec le code de rqt_graph.
+- **Choix** : `scripts/export_rqt_graph.py` produit le graphe nœuds/topics avec le moteur de rqt_graph pendant un essai A puis un essai B (Gazebo sans fenêtre) ; `scripts/filtre_rqt_graph.py` ne garde que nos nœuds et leurs topics. Les topics internes des actions sont regroupés en une boîte ; seule l'action réellement appelée (follow_waypoints) est gardée, car le client BasicNavigator ouvre aussi des clients vers les autres actions de Nav2 sans les appeler. Annexes A7 et A8 du diaporama.
+- **Justification** : le graphe complet (Gazebo, Nav2, cycle de vie) est illisible sur une slide ; nos nœuds suffisent à vérifier les schémas.
+- **Résultat-leçon** : les graphes réels confirment les schémas. Ils montrent aussi deux flux que les schémas simplifiaient : `coverage_executor` lit `/amcl_pose` et `/odom` et publie `/initialpose`. Les CSV de ces essais courts sont rangés dans `results/invalides/`.
