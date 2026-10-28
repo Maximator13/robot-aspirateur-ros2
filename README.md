@@ -1,5 +1,9 @@
 # Robot aspirateur autonome — couverture d'une pièce (ROS 2 Humble, TurtleBot3 Burger)
 
+[![Tests](https://github.com/Maximator13/robot-aspirateur-ros2/actions/workflows/tests.yml/badge.svg)](https://github.com/Maximator13/robot-aspirateur-ros2/actions/workflows/tests.yml)
+
+<img src="https://skillicons.dev/icons?i=ros,py,ubuntu,linux,git,githubactions" alt="ROS 2, Python, Ubuntu, Linux, Git, GitHub Actions">
+
 > Projet réalisé seul en 12 h, en école d'ingénieur (IMT Mines Alès, cours ROS 2).
 
 Un TurtleBot3 Burger doit couvrir la surface libre d'une pièce, en simulation (Gazebo) puis sur le
@@ -17,6 +21,78 @@ Résultats, démarche et limites : [`docs/RESULTATS.md`](docs/RESULTATS.md).
 Architecture : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · Algorigrammes : [`docs/ALGORIGRAMMES.md`](docs/ALGORIGRAMMES.md) ·
 État de l'art : [`docs/ETAT_DE_L_ART.md`](docs/ETAT_DE_L_ART.md) · Journal d'ingénierie : [`docs/JOURNAL.md`](docs/JOURNAL.md) ·
 Perspectives : [`docs/PERSPECTIVES.md`](docs/PERSPECTIVES.md).
+
+## Résultats
+
+Tous les chiffres sont recalculés à partir des CSV de `results/` (une ligne par seconde, colonnes
+`time, coverage_percent, distance, near_collisions`). Les « % à t s » sont interpolés linéairement entre
+deux points CSV, comme dans `scripts/plot_results.py`. Moyenne ± écart-type d'échantillon (n-1).
+« non mesuré » : la donnée n'existe pas dans les CSV, rien n'est extrapolé.
+
+### Simulation — `turtlebot3_world`, 13,9 m² atteignables, 600 s par run
+
+| Stratégie | Runs valides | % à 120 s | % à 300 s | % final (600 s) | Distance (m) | near_collisions |
+|---|---|---|---|---|---|---|
+| A — aléatoire | 6 (seeds 1 à 6) | 17,3 ± 2,3 | 32,4 ± 6,5 | 52,2 ± 5,7 | 70,4 ± 1,3 | 27,2 ± 4,4 |
+| B — boustrophédon + Nav2, tous runs valides | 5 (seeds 1, 2, 3, 5, 6) | 16,3 ± 0,7 | 26,4 ± 6,4 | 43,3 ± 21,8 | 54,2 ± 19,6 | 5,8 ± 10,8 |
+| B — runs non bloqués seulement | 3 (seeds 1, 2, 5) | 16,2 ± 0,7 | 30,9 ± 0,7 | 59,1 ± 3,4 | 68,1 ± 5,2 | 0 ; 2 ; 0 |
+
+Conditions : départ (-2,0 ; -0,5), 0,15 m/s pour A et B, même nœud de mesure `coverage_tracker`.
+A tourne en mode accéléré (validé contre un run en temps réel, `results/comparaison_vitesse/`), B en temps réel
+(le mode accéléré a été invalidé pour Nav2, `results/comparaison_vitesse_B/`), configuration Nav2 « T5 ».
+Les seeds de B ne changent pas le trajet planifié : seules varient les conditions d'exécution.
+80 % n'est atteint par aucun run en simulation. Fiabilité de B : 3 runs réussis sur 7 lancements conformes
+au protocole ; B3 et B6 sont bloqués (gardés dans la moyenne), B4 et B7 ont une mesure faussée
+(saut de localisation, écartés, `results/invalides/`). A : 6 runs sur 6.
+
+### Robot réel — zone en carton de 1,6 m² (620 cellules), séance du 12/10
+
+| Stratégie | Runs valides | % à 120 s | % à 300 s | Temps pour 80 % | Distance (m) | near_collisions |
+|---|---|---|---|---|---|---|
+| A — aléatoire | 2 (seeds 1, 3) | 36,2 ; 30,3 | 73,1 ; 74,8 | non atteint ; non atteint | 19,7 ; 20,9 | 21 ; 19 |
+| B — boustrophédon + `coverage_follower` | 2 | 79,3 ; 75,2 | 98,4 ; non mesuré (arrêt manuel à 170 s, à 96,5 %) | 125 s ; 134 s | 9,8 ; 9,8 | 8 ; 2 |
+
+Conditions : TurtleBot3 Burger réel, LiDAR LDS-02, 0,10 m/s, 300 s prévues, localisation par odométrie seule
+(`localization:=static`). Sur le robot réel, B n'est **pas** exécuté par Nav2 mais par le suiveur de waypoints
+`coverage_follower` (Nav2 n'a pas pu être rendu opérationnel sur ce robot). Un 3ᵉ run B (incident : waypoints
+sautés, 46,8 % à 161 s) est exclu. Valeurs individuelles, pas de moyenne : 2 runs par stratégie.
+
+Courbes : [`results/coverage_vs_time.png`](results/coverage_vs_time.png) (simulation),
+[`results/robot_reel/coverage_vs_time_reel_12oct.png`](results/robot_reel/coverage_vs_time_reel_12oct.png) (robot réel).
+
+### Limites
+
+- **Peu de runs** : 6 (A) et 5 (B) en simulation, 2 + 2 sur le robot réel. Aucun test statistique ; les
+  plages de A et B se recouvrent en simulation.
+- **Conditions différentes entre stratégies** : en simulation, A en mode accéléré et B en temps réel ; A4 et A5
+  lancés avec les fenêtres Gazebo et RViz, contrairement au protocole. Sur le robot réel, B est exécuté par un
+  suiveur simplifié et non par Nav2 : les chiffres réels ne sont pas comparables à ceux de la simulation.
+- **Sources de pose différentes** : en simulation, A est mesuré sur l'odométrie parfaite, B sur la pose AMCL.
+  Sur le robot réel, odométrie seule : le repère dérive, surtout pour A (nombreuses rotations).
+- **Fiabilité de B** : blocages de Nav2 (TF `map → odom` figée ou contrôleur bloqué), cause non établie.
+- **Défaut de mesure connu** : le tracker ne filtre pas les sauts de position (B4 et B7 triés à la main).
+- **Une seule pièce** par environnement. near_collisions n'utilise pas le même seuil que l'évitement de A :
+  le compteur reste indicatif.
+
+Détail complet : [`docs/RESULTATS.md`](docs/RESULTATS.md).
+
+## Architecture
+
+Nœuds du projet pour la stratégie B en simulation (extrait de `rqt_graph`, nœuds tiers masqués).
+Schémas complets avec Nav2 et l'arbre TF : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+![Nœuds et topics de la stratégie B](results/figures/rqt_graph_B_nos_noeuds.png)
+
+## Ce que j'ai écrit / ce qui vient de tiers
+
+| Écrit pour ce projet | Repris tel quel (tiers) |
+|---|---|
+| Message `aspi_interfaces/CoverageStatus` | ROS 2 Humble (`rclpy`, `tf2_ros`, messages standard), RViz 2 |
+| Nœuds `random_walker`, `coverage_planner`, `coverage_executor`, `coverage_follower`, `coverage_tracker` | Gazebo Classic et `gazebo_ros` |
+| Modules Python purs testés : `planning.py` (masque atteignable, mesure de couverture, boustrophédon), `random_logic.py`, `follow_logic.py`, `progress_check.py` | Nav2 : `nav2_bringup`, AMCL, `map_server`, contrôleur Regulated Pure Pursuit, `nav2_simple_commander` (`BasicNavigator`) |
+| Fichiers launch (simulation et robot réel), monde `turtlebot3_world_fast` (copie accélérée de `turtlebot3_world`), monde `zone_reelle` (généré depuis la carte) | TurtleBot3 : modèle du Burger, `turtlebot3_gazebo`, monde `turtlebot3_world`, logiciel embarqué du robot réel |
+| Réglage de Nav2 (essais T0 à T5), à partir du `burger.yaml` de `turtlebot3_navigation2` | Cartographer (carte de simulation `world`) |
+| Scripts d'analyse et de figures (`scripts/`), outils `make_world_from_map.py`, `make_keepout_mask.py` | numpy, matplotlib, pytest |
 
 ## Contenu
 
@@ -48,6 +124,9 @@ source install/setup.bash
 ```bash
 cd ~/ros2_ws/src/aspi_bot && python3 -m pytest test/ -q
 ```
+
+Les mêmes tests tournent sur GitHub Actions à chaque push, sans ROS (Python, numpy et pytest seulement) :
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml).
 
 ## Lancer
 
