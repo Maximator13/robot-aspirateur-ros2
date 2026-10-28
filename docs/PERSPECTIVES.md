@@ -21,7 +21,7 @@ Protocole de mesure commun : même monde, même départ, 600 s simulées, même 
 | 8 | P6. Spirale ou aléatoire amélioré pour A | Moyen | 0,5 jour | Faible |
 | 9 | P8. Une autre pièce | Moyen (généralité) | 1 jour | Moyen |
 | 10 | P7. Décomposition cellulaire de Choset | Élevé en théorie | 3 jours ou plus | Élevé |
-| — | P9. Essai sur robot réel | **Réalisé** (séances des 9 et 12/10, `docs/RESULTATS.md` §7) | — | — |
+| - | P9. Essai sur robot réel | **Réalisé** (séances des 9 et 12/10, `docs/RESULTATS.md` §7) | - | - |
 
 ---
 

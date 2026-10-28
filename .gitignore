@@ -8,6 +8,6 @@ src/turtlebot3_simulations/
 __pycache__/
 *.pyc
 .pytest_cache/
-# Rosbags (volumineux) — les CSV et PNG de results/ restent versionnés
+# Rosbags (volumineux) : les CSV et PNG de results/ restent versionnés
 results/bags/
 results/fenetres/bags/

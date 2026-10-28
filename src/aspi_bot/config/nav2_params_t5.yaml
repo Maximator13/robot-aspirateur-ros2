@@ -1,4 +1,4 @@
-# Fichier d'essai de réglage (conservé pour traçabilité) — la config officielle est nav2_params.yaml
+# Fichier d'essai de réglage (conservé pour traçabilité) : la config officielle est nav2_params.yaml
 # Fichier d'essai T5 : copie de nav2_params.yaml (officielle, T3) + 2 écarts marqués "aspi (essai T5)" :
 #   - FollowPath : approach_velocity_scaling_dist 0.6 -> 0.2
 #   - waypoint_follower : waypoint_pause_duration 200 -> 0 ms

@@ -1,18 +1,18 @@
-# Tickets — Robot aspirateur (CCPP)
+# Tickets : Robot aspirateur (CCPP)
 
 Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 « Fini » = compile + tests OK + tourne en simu + relu + noté au journal.
 
-## Jour 1 — Socle + stratégie A (MVP)
+## Jour 1 : Socle + stratégie A (MVP)
 
 | Id | Description | Responsable | Dépend de | Critère de fini | Statut |
 |---|---|---|---|---|---|
-| J1-01 | Vérification de l'environnement (section 4) | chef de projet | — | Tableau rapporté à l'étudiant | FINI |
-| J1-02 | Mise en place : `git init`, `.gitignore`, squelette `aspi_bot` | chef de projet | — | Arborescence créée | FINI |
-| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + exploration par `random_walker`, au lieu de la téléop prévue) **depuis le spawn** | chef de projet (exploration par random_walker) | — | Carte fermée, visible dans RViz | FINI |
-| J1-04 | `planning.py` (masque libre, érosion, composante connexe, marquage de disque, % couvert, boustrophédon) + `random_logic.py` | ingénieur algorithmes | — | Python pur, importable sans ROS, docstrings | FINI |
+| J1-01 | Vérification de l'environnement (section 4) | chef de projet | - | Tableau rapporté à l'étudiant | FINI |
+| J1-02 | Mise en place : `git init`, `.gitignore`, squelette `aspi_bot` | chef de projet | - | Arborescence créée | FINI |
+| J1-03 | Carte de référence `maps/world.{yaml,pgm}` (Cartographer + exploration par `random_walker`, au lieu de la téléop prévue) **depuis le spawn** | chef de projet (exploration par random_walker) | - | Carte fermée, visible dans RViz | FINI |
+| J1-04 | `planning.py` (masque libre, érosion, composante connexe, marquage de disque, % couvert, boustrophédon) + `random_logic.py` | ingénieur algorithmes | - | Python pur, importable sans ROS, docstrings | FINI |
 | J1-05 | `aspi_interfaces` (`CoverageStatus.msg`), `random_walker_node.py`, `coverage_tracker_node.py`, `rviz/aspi.rviz` | développeur ROS | contrats ci-dessous | `colcon build` OK | FINI |
-| J1-06 | État de l'art (`docs/ETAT_DE_L_ART.md`) | rédacteur technique | — | 6 approches, sources réelles | FINI |
+| J1-06 | État de l'art (`docs/ETAT_DE_L_ART.md`) | rédacteur technique | - | 6 approches, sources réelles | FINI |
 | J1-07 | Tests pytest de `planning.py` et `random_logic.py` | ingénieur test | J1-04 | `pytest` vert | FINI |
 | J1-08 | `launch/aspi_random.launch.py` | chef de projet | J1-03, J1-05 | Lance Gazebo + map_server + TF + nœuds + RViz | FINI |
 | J1-09 | Revue de J1-04/05/07/08 | relecteur | J1-04..08 | Aucun BLOQUANT | FINI |
@@ -22,15 +22,15 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 | J1-13 | Mode headless + accéléré, validation par critères (seed 1 temps réel vs accéléré) | chef de projet + ingénieur test | J1-10 | 5 critères OK | FINI |
 | J1-14 | Runs A seeds 2 et 3 (accéléré) | ingénieur test | J1-13 | CSV + courbe 3 runs | FINI |
 
-## Jour 2 — Stratégie B (planifiée, Nav2)
+## Jour 2 : Stratégie B (planifiée, Nav2)
 
 | Id | Description | Responsable | Dépend de | Critère de fini | Statut |
 |---|---|---|---|---|---|
-| J2-01 | `config/nav2_params.yaml` (copie de `turtlebot3_navigation2/param/humble/burger.yaml`, écarts documentés) | développeur ROS | — | YAML valide, écarts commentés | FINI |
-| J2-02 | `coverage_planner_node.py` (`/map` → `/coverage_path`) + displays Nav2 dans `rviz/aspi.rviz` | développeur ROS | — | build OK, trajet visible dans RViz | FINI |
-| J2-03 | `coverage_executor_node.py` (BasicNavigator, `followWaypoints`) + arrêt propre du `random_walker` | développeur ROS | — | build OK | FINI |
+| J2-01 | `config/nav2_params.yaml` (copie de `turtlebot3_navigation2/param/humble/burger.yaml`, écarts documentés) | développeur ROS | - | YAML valide, écarts commentés | FINI |
+| J2-02 | `coverage_planner_node.py` (`/map` → `/coverage_path`) + displays Nav2 dans `rviz/aspi.rviz` | développeur ROS | - | build OK, trajet visible dans RViz | FINI |
+| J2-03 | `coverage_executor_node.py` (BasicNavigator, `followWaypoints`) + arrêt propre du `random_walker` | développeur ROS | - | build OK | FINI |
 | J2-04 | `launch/sim.launch.py` (Gazebo commun A/B), `aspi_random` l'inclut, `aspi_planned.launch.py` | chef de projet | J2-01..03 | Les deux launch démarrent | FINI |
-| J2-05 | `docs/ARCHITECTURE.md` + `docs/ALGORIGRAMMES.md` (A maintenant, B une fois le code écrit) | rédacteur technique | — | Mermaid fidèle au code | FINI |
+| J2-05 | `docs/ARCHITECTURE.md` + `docs/ALGORIGRAMMES.md` (A maintenant, B une fois le code écrit) | rédacteur technique | - | Mermaid fidèle au code | FINI |
 | J2-06 | Revue J2-01..04 | relecteur | J2-01..04 | Aucun BLOQUANT | FINI |
 | J2-07 | Nav2 seul : un goal manuel atteint (par script, temps réel) | ingénieur test | J2-06 | Goal atteint, AMCL localisé | FINI |
 | J2-08 | Run B complet en temps réel + non-régression de A (smoke test du launch refactorisé) | ingénieur test | J2-07 | CSV BOUSTROPHEDON | FINI |
@@ -40,16 +40,16 @@ Statuts : `À FAIRE` · `EN COURS` · `REVUE` · `FINI` · `BLOQUÉ`
 | J2-13 | Protocole B (600 s, 3 runs, temps réel, config T5) + comparaison A/B | ingénieur test + analyste résultats | J2-09, J2-12 | Courbe A vs B | FINI (A 51.0 ± 6.7 %, B 44.1 ± 23.4 % dont B3 bloqué) |
 | J2-10 | Journal du jour 2 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
 
-## Jour 3 — Évaluation et livrables (code gelé)
+## Jour 3 : Évaluation et livrables (code gelé)
 
 Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de l'étudiant) : les figures de
 `results/` servent de captures de démo.
 
 | Id | Description | Responsable | Dépend de | Critère de fini | Statut |
 |---|---|---|---|---|---|
-| J3-01 | Audit de cohérence de tous les documents (chiffres identiques partout et conformes aux CSV, hypothèse ≠ fait, références) | relecteur | — | Liste d'écarts BLOQUANT / À CORRIGER | FINI (6 bloquants, ≈ 25 à corriger) |
-| J3-02 | Plan des slides (10 min, sans code) + préparation des questions du jury | rédacteur technique | — | `docs/PLAN_SOUTENANCE.md` | FINI |
-| J3-03 | `README.md` : construire, lancer A et B, tester, tracer les courbes | chef de projet | — | Commandes vérifiées | FINI |
+| J3-01 | Audit de cohérence de tous les documents (chiffres identiques partout et conformes aux CSV, hypothèse ≠ fait, références) | relecteur | - | Liste d'écarts BLOQUANT / À CORRIGER | FINI (6 bloquants, ≈ 25 à corriger) |
+| J3-02 | Plan des slides (10 min, sans code) + préparation des questions du jury | rédacteur technique | - | `docs/PLAN_SOUTENANCE.md` | FINI |
+| J3-03 | `README.md` : construire, lancer A et B, tester, tracer les courbes | chef de projet | - | Commandes vérifiées | FINI |
 | J3-04 | Corrections issues de l'audit, par les propriétaires des fichiers | propriétaires des fichiers | J3-01 | Aucun écart restant | FINI |
 | J3-05 | Journal du jour 3 | opérateur / scribe | toutes | Entrées au format du brief | FINI |
 
@@ -57,10 +57,10 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
 
 | Id | Description | Responsable | Dépend de | Critère de fini | Statut |
 |---|---|---|---|---|---|
-| R-01 | Barrière virtuelle (rectangle en repère odom) : fonction pure dans `random_logic.py` | ingénieur algorithmes | — | Python pur, testable | FINI |
+| R-01 | Barrière virtuelle (rectangle en repère odom) : fonction pure dans `random_logic.py` | ingénieur algorithmes | - | Python pur, testable | FINI |
 | R-02 | `random_walker` : abonnement `/odom` + paramètre `fence` (désactivé par défaut) ; `config/nav2_params_real.yaml` ; keepout filter Nav2 (masque + config) ; script d'arrêt | développeur ROS | R-01 (contrat) | build OK | FINI |
 | R-03 | `aspi_real_random.launch.py`, `aspi_real_planned.launch.py` (sans Gazebo, `use_sim_time` false par défaut) | chef de projet | R-02 | Launch valides | FINI |
-| R-04 | `docs/JOUR_ROBOT.md` : réseau WSL2 (procédure seulement), plan B partage de connexion, checklist du jour | rédacteur technique | — | Commandes exactes, quoi faire si échec | FINI |
+| R-04 | `docs/JOUR_ROBOT.md` : réseau WSL2 (procédure seulement), plan B partage de connexion, checklist du jour | rédacteur technique | - | Commandes exactes, quoi faire si échec | FINI |
 | R-05 | Tests en simulation de tout ce qui peut l'être (launch réels avec `use_sim_time:=true` + Gazebo, barrière, keepout) + tests pytest | ingénieur test | R-01..R-03 | Résultats rapportés | FINI |
 | R-06 | Revue | relecteur | R-01..R-05 | Aucun BLOQUANT | FINI |
 | R-07 | Journal + commit | opérateur / scribe, chef de projet | toutes | Entrée au journal | FINI |
@@ -85,13 +85,13 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
   `scripts/stop_robot.sh` (publie un Twist nul sur `/cmd_vel` plusieurs fois).
 - **LiDAR** : LDS-01 `range_min` 0.12 m, LDS-02 ≈ 0.16 m → `near_collision_distance` 0.20 m sur le robot réel
   (sinon métrique toujours nulle avec un LDS-02, même piège qu'au jour 1).
-- **Barrière virtuelle A** — `random_logic.fence_distance_ahead(x, y, yaw, fence, front_angle) -> float` :
+- **Barrière virtuelle A**. `random_logic.fence_distance_ahead(x, y, yaw, fence, front_angle) -> float` :
   `fence = (xmin, ymin, xmax, ymax)` en repère odom ; robot DANS le rectangle → distance minimale au bord le long de
   rayons du secteur avant [-front_angle, +front_angle] ; robot HORS du rectangle → 0.0 s'il s'éloigne du centre
   (force un virage), inf s'il revient vers le centre (|écart de cap vers le centre| < 90°). Le nœud prend
   `min(distance LiDAR, distance barrière)`. Paramètre `fence` = [] (désactivé) par défaut.
 - **Mesure A sur le robot réel** : la carte sert de vérité terrain ; `map → odom` vient d'AMCL (localisation seule,
-  pose initiale (0, 0, 0) fixée par paramètre) — le robot, lui, n'utilise pas la carte. Repli : TF statique identité
+  pose initiale (0, 0, 0) fixée par paramètre). Le robot, lui, n'utilise pas la carte. Repli : TF statique identité
   (`localization:=static`) si AMCL pose problème (odométrie réelle qui dérive : limite).
 - **Keepout B** : masque `maps/keepout.{yaml,pgm}` généré à partir de la carte et d'un rectangle autorisé
   (`scripts/make_keepout_mask.py`) ; `costmap_filter_info_server` + `map_server` du masque ; plugin
@@ -101,13 +101,13 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
 
 ### Contrats jour 2 (fixés par l'architecte)
 
-- **`coverage_planner`** — paramètres : `robot_radius` (0.105), `safety_margin` (0.05), `sweep_spacing` (0.18),
+- **`coverage_planner`**. Paramètres : `robot_radius` (0.105), `safety_margin` (0.05), `sweep_spacing` (0.18),
   `start_x` (0.0), `start_y` (0.0) (départ = origine de la carte = spawn). S'abonne à `/map` (RELIABLE +
   TRANSIENT_LOCAL), calcule `reachable_mask` puis `boustrophedon_waypoints` (fonctions de `planning.py`, les
   mêmes que le tracker), publie **une fois par carte reçue** `/coverage_path` (`nav_msgs/Path`, frame `map`,
   RELIABLE + TRANSIENT_LOCAL pour un abonné tardif). Log : nb de cellules atteignables et de waypoints.
-- **`coverage_planner` (ajout jour 2)** — `plan_transitions` (False : essai T4 négatif), `transition_step` (0.3 m).
-- **`coverage_executor`** — paramètres : `initial_x` (0.0), `initial_y` (0.0), `initial_yaw` (0.0),
+- **`coverage_planner` (ajout jour 2)** : `plan_transitions` (False : essai T4 négatif), `transition_step` (0.3 m).
+- **`coverage_executor`**. Paramètres : `initial_x` (0.0), `initial_y` (0.0), `initial_yaw` (0.0),
   `max_duration` (0.0 = illimité ; le launch le règle à `run_duration + 10` s : arrêt propre après la mesure).
   Structure séquentielle (pas de callback bloquant) : `BasicNavigator` → attendre `/coverage_path` → pose initiale
   → attente de Nav2 **avec délais** (amcl actif → pose initiale republiée jusqu'à `/amcl_pose` → bt_navigator actif
@@ -126,7 +126,7 @@ Code gelé : seuls des correctifs de documentation. Pas de vidéo (décision de 
 
 ## Contrats d'interface (fixés par l'architecte)
 
-### `aspi_bot/planning.py` — Python pur (numpy), aucun import ROS
+### `aspi_bot/planning.py` : Python pur (numpy), aucun import ROS
 
 Convention : grille numpy `(height, width)`, indexée `[row, col]`, `row` = y croissant
 (même ordre que `OccupancyGrid.data` ligne-major, origine en bas à gauche). Rotation de l'origine ignorée (= 0 pour map_server).
@@ -149,7 +149,7 @@ boustrophedon_waypoints(reachable, origin_x, origin_y, resolution, sweep_spacing
     # waypoints = extrémités de segments, yaw = sens de passage
 ```
 
-### `aspi_bot/random_logic.py` — Python pur
+### `aspi_bot/random_logic.py` : Python pur
 
 ```python
 front_min_distance(ranges, angle_min, angle_increment, range_min, range_max, front_angle) -> float

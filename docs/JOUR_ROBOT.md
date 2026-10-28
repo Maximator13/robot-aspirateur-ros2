@@ -1,4 +1,4 @@
-# Journée robot réel — guide pas à pas
+# Journée robot réel : guide pas à pas
 
 Ce guide sert le jour où l'on travaille avec le vrai TurtleBot3 Burger, à l'école.
 Les phrases sont courtes. Chaque étape dit où exécuter, quoi taper, ce qu'on doit voir, et quoi faire si ça échoue.
@@ -79,7 +79,7 @@ Si l'OpenCR n'est pas à jour : ne pas le mettre à jour sans l'accord du prof. 
 
 ---
 
-## 2. Réseau PC (WSL 2) ↔ robot — procédure
+## 2. Réseau PC (WSL 2) ↔ robot : procédure
 
 **Rien de cette section n'a été appliqué.** C'est une procédure que l'étudiant exécute lui-même, sur place.
 
@@ -247,7 +247,7 @@ Si seuls `/parameter_events` et `/rosout` apparaissent :
 3. Multicast bloqué (test c).
 4. `ros2 daemon stop` puis `ros2 topic list` (le démon garde parfois un état ancien).
 
-### 2.6 Plan B — partage de connexion du téléphone
+### 2.6 Plan B : partage de connexion du téléphone
 
 À utiliser si le Wi-Fi de l'école bloque le multicast ou isole les clients. **Seulement si le prof autorise la modification du robot.**
 
@@ -294,7 +294,7 @@ Si seuls `/parameter_events` et `/rosout` apparaissent :
 
 Limite connue : certains téléphones isolent aussi les clients, ou n'autorisent pas le multicast. Si c'est le cas : plan C.
 
-### 2.7 Plan C — DDS ne passe pas
+### 2.7 Plan C : DDS ne passe pas
 
 Si les tests 2.5 c et d échouent malgré les plans A et B :
 

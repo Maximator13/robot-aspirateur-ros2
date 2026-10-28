@@ -1,4 +1,4 @@
-# Fichier d'essai de réglage (conservé pour traçabilité) — la config officielle est nav2_params.yaml
+# Fichier d'essai de réglage (conservé pour traçabilité) : la config officielle est nav2_params.yaml
 # aspi T2 : copie de nav2_params.yaml (T1) + inflation des costmaps adaptée au balayage (voir "# aspi T2" dans le fichier).
 # aspi : configuration Nav2 de la stratégie B.
 # Source : /opt/ros/humble/share/turtlebot3_navigation2/param/humble/burger.yaml (version Humble).

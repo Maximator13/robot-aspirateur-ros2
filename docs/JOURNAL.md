@@ -1,4 +1,4 @@
-# Journal d'ingénierie — Robot aspirateur (CCPP)
+# Journal d'ingénierie : Robot aspirateur (CCPP)
 
 Format de chaque entrée : date · contexte · options envisagées · choix · justification · résultat / leçon.
 
@@ -361,7 +361,7 @@ Format de chaque entrée : date · contexte · options envisagées · choix · j
 - **Justification** : un processus lancé en arrière-plan (`&`, `nohup`) par un shell non interactif hérite d'un SIGINT ignoré. Python n'installe alors pas son gestionnaire de SIGINT. Ce mécanisme explique au moins en partie les executors survivants observés. Ce n'était donc pas uniquement un défaut de notre code.
 - **Résultat-leçon** : avant de conclure à un bug du code testé, vérifier l'outil de test (signaux hérités, environnement du shell). La méthode de test a été corrigée.
 
-### 2026-10-08 · Jour 3 du plan — code gelé, pas de vidéo de démonstration
+### 2026-10-08 · Jour 3 du plan : code gelé, pas de vidéo de démonstration
 
 - **Contexte** : le jour 3 est consacré à l'évaluation et aux livrables. Le cahier de soutenance demande « vidéo ou captures de la démo ».
 - **Options envisagées** :

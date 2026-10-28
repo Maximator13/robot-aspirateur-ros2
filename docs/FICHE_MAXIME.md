@@ -1,4 +1,4 @@
-# Fiche express — mes slides (1, 2, 12, 13, 15, 16, 17, 22)
+# Fiche express : mes slides (1, 2, 12, 13, 15, 16, 17, 22)
 
 À relire juste avant de passer. Chaque slide : **ce que je dis** (à l'oral, court), **les chiffres**, **les questions pièges** avec la réponse.
 
@@ -15,19 +15,19 @@
 
 ---
 
-## Slide 1 — Titre (10 s)
+## Slide 1 : Titre (10 s)
 
 **Je dis** : « Notre question : un robot aspirateur qui planifie son trajet sur une carte nettoie-t-il mieux qu'un robot qui roule au hasard ? On compare deux stratégies, A au hasard et B planifiée. »
 
 **Si on me demande « c'est quoi le sujet exact ? »** : le CCPP, *Complete Coverage Path Planning* : passer sur toute la surface libre d'une pièce.
 
-## Slide 2 — Sommaire (15 s)
+## Slide 2 : Sommaire (15 s)
 
 **Je dis** : « D'abord le problème et ce qui existe, puis nos deux stratégies. Ensuite trois bancs d'essai, toujours dans le même ordre, A puis B puis une conclusion : la simulation, le vrai robot, puis un jumeau numérique de la zone réelle. On finit par les limites et la suite. »
 
 ---
 
-## Slide 12 — Le terrain réel (20 s)
+## Slide 12 : Le terrain réel (20 s)
 
 **Je dis** :
 - « Une zone fermée en carton, environ 1,6 m², une croix de départ au sol, la même pour A et B. »
@@ -43,7 +43,7 @@ On n'utilise pas AMCL sur le vrai robot : la position vient **des roues seules**
 
 ---
 
-## Slide 13 — A sur le vrai robot (25 s)
+## Slide 13 : A sur le vrai robot (25 s)
 
 **Je dis** : « A monte par paliers : **73 et 75 %** en 5 min, jamais 80 %. Il roule environ **20 m**. Les plateaux, par exemple entre 50 et 100 s : il roule, mais ne gagne rien. Il repasse où il est déjà passé, et il longe les murs, dans la bande de 20 cm que la mesure ne compte pas. »
 
@@ -57,7 +57,7 @@ On n'utilise pas AMCL sur le vrai robot : la position vient **des roues seules**
 
 ---
 
-## Slide 15 — Notre solution : le suiveur (35 s)
+## Slide 15 : notre solution, le suiveur (35 s)
 
 **Je dis** :
 - « Nav2 ne faisait pas avancer le vrai robot. Plutôt que de s'acharner, on a gardé **exactement le même plan** et changé seulement celui qui conduit. »
@@ -75,7 +75,7 @@ On n'utilise pas AMCL sur le vrai robot : la position vient **des roues seules**
 
 ---
 
-## Slide 16 — B sur le vrai robot (30 s)
+## Slide 16 : B sur le vrai robot (30 s)
 
 **Je dis** : « Avec le suiveur, B fait ce que son plan prévoit : il passe **80 % en 125 et 134 s**, et finit son trajet vers 2 min 30 à **98 et 96,5 %**, en roulant **10 m**. » Puis lancer la vidéo.
 
@@ -87,7 +87,7 @@ On n'utilise pas AMCL sur le vrai robot : la position vient **des roues seules**
 
 ---
 
-## Slide 17 — Conclusion du robot réel (30 s)
+## Slide 17 : Conclusion du robot réel (30 s)
 
 **Je dis** :
 - « B atteint 80 % en 2 min avec 10 m ; A ne l'atteint jamais en 5 min, avec 20 m. »
@@ -100,7 +100,7 @@ On n'utilise pas AMCL sur le vrai robot : la position vient **des roues seules**
 
 ---
 
-## Slide 22 — Conclusion générale (35 s)
+## Slide 22 : Conclusion générale (35 s)
 
 **Je dis** : « Notre réponse : **oui, planifier aide**, à condition que le robot sache suivre le plan. En simulation, Nav2 perdait du temps et se bloquait 4 fois sur 7 ; sur le vrai robot, il ne roulait pas ; avec un conducteur simple, B a nettement battu A. »
 

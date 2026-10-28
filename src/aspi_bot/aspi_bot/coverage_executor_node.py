@@ -89,7 +89,7 @@ def check_validated(nav, monitor, odom, poses, start_xy, last_wp, new_wp, state)
             else:
                 critere = ''
             log.error(f'progression anormale : {monitor.suspects} waypoints validés '
-                      f'sans déplacement réel (odométrie){critere} — arrêt '
+                      f'sans déplacement réel (odométrie){critere}, arrêt '
                       f'(waypoint {i + 1}/{len(poses)} : attendu {exp:.2f} m, '
                       f'parcouru {share:.2f} m, en {dt:.1f} s)')
             return True

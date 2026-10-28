@@ -1,4 +1,4 @@
-# Robot aspirateur autonome — couverture d'une pièce (ROS 2 Humble, TurtleBot3 Burger)
+# Robot aspirateur autonome : couverture d'une pièce (ROS 2 Humble, TurtleBot3 Burger)
 
 [![Tests](https://github.com/Maximator13/robot-aspirateur-ros2/actions/workflows/tests.yml/badge.svg)](https://github.com/Maximator13/robot-aspirateur-ros2/actions/workflows/tests.yml)
 
@@ -9,8 +9,8 @@
 Un TurtleBot3 Burger doit couvrir la surface libre d'une pièce, en simulation (Gazebo) puis sur le
 vrai robot avec son LiDAR. Deux stratégies sont comparées avec **la même mesure** :
 
-- **A — aléatoire** (« bump and turn ») : sans carte, avance et tourne d'un angle aléatoire devant un obstacle ;
-- **B — planifiée** : balayage boustrophédon calculé sur la carte, exécuté par Nav2 en simulation et par un
+- **A (aléatoire)** (« bump and turn ») : sans carte, avance et tourne d'un angle aléatoire devant un obstacle ;
+- **B (planifiée)** : balayage boustrophédon calculé sur la carte, exécuté par Nav2 en simulation et par un
   suiveur de points de passage (`coverage_follower`) sur le robot réel.
 
 Sur le robot réel, B atteint 80 % de couverture en environ 2 min (96,5 et 98,4 % en fin de trajet), contre
@@ -29,13 +29,13 @@ Tous les chiffres sont recalculés à partir des CSV de `results/` (une ligne pa
 deux points CSV, comme dans `scripts/plot_results.py`. Moyenne ± écart-type d'échantillon (n-1).
 « non mesuré » : la donnée n'existe pas dans les CSV, rien n'est extrapolé.
 
-### Simulation — `turtlebot3_world`, 13,9 m² atteignables, 600 s par run
+### Simulation : `turtlebot3_world`, 13,9 m² atteignables, 600 s par run
 
 | Stratégie | Runs valides | % à 120 s | % à 300 s | % final (600 s) | Distance (m) | near_collisions |
 |---|---|---|---|---|---|---|
-| A — aléatoire | 6 (seeds 1 à 6) | 17,3 ± 2,3 | 32,4 ± 6,5 | 52,2 ± 5,7 | 70,4 ± 1,3 | 27,2 ± 4,4 |
-| B — boustrophédon + Nav2, tous runs valides | 5 (seeds 1, 2, 3, 5, 6) | 16,3 ± 0,7 | 26,4 ± 6,4 | 43,3 ± 21,8 | 54,2 ± 19,6 | 5,8 ± 10,8 |
-| B — runs non bloqués seulement | 3 (seeds 1, 2, 5) | 16,2 ± 0,7 | 30,9 ± 0,7 | 59,1 ± 3,4 | 68,1 ± 5,2 | 0 ; 2 ; 0 |
+| A (aléatoire) | 6 (seeds 1 à 6) | 17,3 ± 2,3 | 32,4 ± 6,5 | 52,2 ± 5,7 | 70,4 ± 1,3 | 27,2 ± 4,4 |
+| B (boustrophédon + Nav2), tous runs valides | 5 (seeds 1, 2, 3, 5, 6) | 16,3 ± 0,7 | 26,4 ± 6,4 | 43,3 ± 21,8 | 54,2 ± 19,6 | 5,8 ± 10,8 |
+| B (Nav2), runs non bloqués seulement | 3 (seeds 1, 2, 5) | 16,2 ± 0,7 | 30,9 ± 0,7 | 59,1 ± 3,4 | 68,1 ± 5,2 | 0 ; 2 ; 0 |
 
 Conditions : départ (-2,0 ; -0,5), 0,15 m/s pour A et B, même nœud de mesure `coverage_tracker`.
 A tourne en mode accéléré (validé contre un run en temps réel, `results/comparaison_vitesse/`), B en temps réel
@@ -45,12 +45,12 @@ Les seeds de B ne changent pas le trajet planifié : seules varient les conditio
 au protocole ; B3 et B6 sont bloqués (gardés dans la moyenne), B4 et B7 ont une mesure faussée
 (saut de localisation, écartés, `results/invalides/`). A : 6 runs sur 6.
 
-### Robot réel — zone en carton de 1,6 m² (620 cellules), séance du 12/10
+### Robot réel : zone en carton de 1,6 m² (620 cellules), séance du 12/10
 
 | Stratégie | Runs valides | % à 120 s | % à 300 s | Temps pour 80 % | Distance (m) | near_collisions |
 |---|---|---|---|---|---|---|
-| A — aléatoire | 2 (seeds 1, 3) | 36,2 ; 30,3 | 73,1 ; 74,8 | non atteint ; non atteint | 19,7 ; 20,9 | 21 ; 19 |
-| B — boustrophédon + `coverage_follower` | 2 | 79,3 ; 75,2 | 98,4 ; non mesuré (arrêt manuel à 170 s, à 96,5 %) | 125 s ; 134 s | 9,8 ; 9,8 | 8 ; 2 |
+| A (aléatoire) | 2 (seeds 1, 3) | 36,2 ; 30,3 | 73,1 ; 74,8 | non atteint ; non atteint | 19,7 ; 20,9 | 21 ; 19 |
+| B (boustrophédon + `coverage_follower`) | 2 | 79,3 ; 75,2 | 98,4 ; non mesuré (arrêt manuel à 170 s, à 96,5 %) | 125 s ; 134 s | 9,8 ; 9,8 | 8 ; 2 |
 
 Conditions : TurtleBot3 Burger réel, LiDAR LDS-02, 0,10 m/s, 300 s prévues, localisation par odométrie seule
 (`localization:=static`). Sur le robot réel, B n'est **pas** exécuté par Nav2 mais par le suiveur de waypoints
@@ -149,7 +149,7 @@ Arguments utiles :
 | `seed` | 1 | Graine (A) ; numéro du run dans le nom du CSV (A et B) |
 | `run_duration` | 600.0 | Durée de la mesure, en secondes simulées |
 | `headless` | false | `true` : ni fenêtre Gazebo ni RViz |
-| `fast` | false | `true` : simulation accélérée — **validée pour A uniquement** |
+| `fast` | false | `true` : simulation accélérée, **validée pour A uniquement** |
 | `nav2_params` | `config/nav2_params.yaml` | (B) fichier de paramètres Nav2 |
 | `plan_transitions` | false | (B) contournements calculés par le planner (essai T4, négatif) |
 
