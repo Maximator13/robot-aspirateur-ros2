@@ -9,8 +9,8 @@
 Un TurtleBot3 Burger doit couvrir la surface libre d'une pièce, en simulation (Gazebo) puis sur le
 vrai robot avec son LiDAR. Deux stratégies sont comparées avec **la même mesure** :
 
-- **A (aléatoire)** (« bump and turn ») : sans carte, avance et tourne d'un angle aléatoire devant un obstacle ;
-- **B (planifiée)** : balayage boustrophédon calculé sur la carte, exécuté par Nav2 en simulation et par un
+- **A, aléatoire** (« bump and turn ») : sans carte, avance et tourne d'un angle aléatoire devant un obstacle ;
+- **B, planifiée** : balayage boustrophédon calculé sur la carte, exécuté par Nav2 en simulation et par un
   suiveur de points de passage (`coverage_follower`) sur le robot réel.
 
 Sur le robot réel, B atteint 80 % de couverture en environ 2 min (96,5 et 98,4 % en fin de trajet), contre
